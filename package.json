@@ -4,14 +4,22 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:https": "local-ssl-proxy --source 3001 --target 3000 --key .certs/localhost-key.pem --cert .certs/localhost.pem",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:sandbox": "tsx scripts/seedAmplifySandbox.ts"
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.5.5",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1009.0",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^3.2.0",
     "aws-amplify": "^6.6.6",
+    "ethers": "^6.16.0",
+    "jose": "^6.2.1",
     "next": "14.2.10",
     "react": "^18",
     "react-dom": "^18"
@@ -28,6 +36,7 @@
     "esbuild": "^0.23.1",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.10",
+    "local-ssl-proxy": "^2.0.5",
     "tsx": "^4.19.0",
     "typescript": "^5.6.2",
     "vitest": "^3.2.4"

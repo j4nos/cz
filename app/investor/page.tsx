@@ -1,13 +1,30 @@
-import Link from "next/link";
+import { PlainCta } from "@/components/sections/PlainCta";
 
 export default function InvestorDashboardPage() {
   return (
-    <section>
-      <h1>Investor dashboard</h1>
-      <nav>
-        <Link href="/investor/listings">Browse listings</Link> <Link href="/investor/orders">Orders</Link>{" "}
-        <Link href="/investor/portfolio">Portfolio</Link> <Link href="/investor/kyc">KYC</Link>
-      </nav>
-    </section>
+    <div className="vertical-stack-with-gap">
+      <header>
+        <h1>Investor Dashboard</h1>
+        <p className="muted">Quick access to your investing tools.</p>
+      </header>
+      <PlainCta
+        title="Browse listings"
+        text="Find opportunities that match your strategy and start an investment checkout."
+        actionLabel="View listings"
+        href="/investor/listings"
+      />
+      <PlainCta
+        title="Track your orders"
+        text="See your latest orders and payment status across providers."
+        actionLabel="Orders"
+        href="/investor/orders"
+      />
+      <PlainCta
+        title="Portfolio overview"
+        text="Review paid investments and their allocations."
+        actionLabel="Open portfolio"
+        href="/investor/portfolio"
+      />
+    </div>
   );
 }

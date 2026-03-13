@@ -1,103 +1,84 @@
 ```mermaid
 sequenceDiagram
-  actor AssetProvider
-  participant UI
-  participant controller
-  participant InvestmentPlatformService
-  participant BrowserInvestmentRepository
-  participant browserDemoStore
-  actor Investor
-  participant PaymentProvider
+  actor AssetProvider as AssetProvider
+  participant UI as UI
+  participant AssetController as AssetController
+  participant ListingController as ListingController
+  participant PricingController as PricingController
+  participant Service as InvestmentPlatformService
+  participant Repo as AmplifyInvestmentRepository
 
-  Note over AssetProvider,browserDemoStore: Asset creation flow
-  AssetProvider->>UI: Submit asset wizard in AssetWizardStep4Page
-  UI->>controller: createAssetWithMedia(input)
-  controller->>InvestmentPlatformService: createAsset(input)
-  InvestmentPlatformService->>BrowserInvestmentRepository: createAsset(Asset)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  InvestmentPlatformService-->>controller: Asset
-  controller->>BrowserInvestmentRepository: saveAssetRecord(Asset imageUrls documents)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  controller-->>UI: Asset
+  AssetProvider->>UI: register / login
+  AssetProvider->>UI: submit asset form
+  UI->>AssetController: createAssetWithMedia(...)
+  AssetController->>Service: createAsset(...)
+  Service->>Repo: getUserProfileById(tenantUserId)
+  Repo-->>Service: UserProfile
+  Service->>Repo: createAsset(Asset)
+  Repo-->>Service: Asset
+  AssetController->>Repo: updateAsset(Asset)
+  Repo-->>AssetController: Asset
+  AssetController-->>UI: Asset
 
-  Note over AssetProvider,browserDemoStore: Listing creation flow
-  AssetProvider->>UI: Save listing form in CreateEditListingClient
-  UI->>controller: createListingDraft(input)
-  controller->>InvestmentPlatformService: createListing(input)
-  InvestmentPlatformService->>BrowserInvestmentRepository: getAssetById(assetId)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  BrowserInvestmentRepository-->>InvestmentPlatformService: Asset
-  InvestmentPlatformService->>BrowserInvestmentRepository: createListing(Listing)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  InvestmentPlatformService-->>controller: Listing
-  controller->>BrowserInvestmentRepository: saveListing(Listing)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  controller-->>UI: Listing
+  AssetProvider->>UI: submit listing form
+  UI->>ListingController: createListingDraft(...)
+  ListingController->>Service: createListing(...)
+  Service->>Repo: getAssetById(assetId)
+  Repo-->>Service: Asset
+  Service->>Repo: getUserProfileById(asset.tenantUserId)
+  Repo-->>Service: UserProfile
+  Service->>Repo: createListing(Listing)
+  Repo-->>Service: Listing
+  ListingController-->>UI: Listing
 
-  Note over AssetProvider,browserDemoStore: Product pricing flow
-  AssetProvider->>UI: Save product pricing in PricingPageClient
-  UI->>controller: saveProductPricing(ProductPricingState)
-  controller->>BrowserInvestmentRepository: getProductById(productId)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  alt Product exists
-    controller->>BrowserInvestmentRepository: updateProduct(Product)
-    BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-    BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  else Product does not exist
-    controller->>InvestmentPlatformService: createProduct(input)
-    InvestmentPlatformService->>BrowserInvestmentRepository: getListingById(listingId)
-    BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-    BrowserInvestmentRepository-->>InvestmentPlatformService: Listing
-    InvestmentPlatformService->>BrowserInvestmentRepository: createProduct(Product)
-    BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-    BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  end
-  controller->>BrowserInvestmentRepository: savePricingState(ProductPricingState)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  controller-->>UI: ProductPricingState
+  AssetProvider->>UI: save pricing / product
+  UI->>PricingController: savePricingState(ProductPricingState)
+  PricingController->>Service: createProduct(...)
+  Service->>Repo: getListingById(listingId)
+  Repo-->>Service: Listing
+  Service->>Repo: createProduct(Product)
+  Repo-->>Service: Product
+  PricingController-->>UI: ProductPricingState
+```
 
-  Note over Investor,browserDemoStore: Investment flow
-  Investor->>UI: Click Go to Checkout in ListingDetails
-  UI->>UI: Build query params(listingId productId quantity coupon)
-  UI->>UI: router.push(/checkout?... )
-  Investor->>UI: Click Place Order in CheckoutPageClient
-  UI->>controller: placeOrder(input)
-  controller->>InvestmentPlatformService: startOrder(input)
-  InvestmentPlatformService->>BrowserInvestmentRepository: getUserProfileById(investorId)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  InvestmentPlatformService->>BrowserInvestmentRepository: getListingById(listingId)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  InvestmentPlatformService->>BrowserInvestmentRepository: getProductById(productId)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  InvestmentPlatformService->>BrowserInvestmentRepository: getAssetById(assetId)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  InvestmentPlatformService->>BrowserInvestmentRepository: createOrder(Order)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  InvestmentPlatformService-->>controller: Order
-  controller-->>UI: Order pending payment
-  UI->>UI: router.push(/investor/orders/:orderId?... )
+## Investor flow
 
-  Investor->>UI: Click Complete payment in InvestorOrderDetailsPage
-  UI->>PaymentProvider: Complete payment
-  PaymentProvider-->>UI: Payment confirmed
-  UI->>controller: completeOrder(orderId)
-  controller->>InvestmentPlatformService: completeOrderPayment(orderId)
-  InvestmentPlatformService->>BrowserInvestmentRepository: getOrderById(orderId)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  InvestmentPlatformService->>BrowserInvestmentRepository: getProductById(productId)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  InvestmentPlatformService->>BrowserInvestmentRepository: updateProduct(Product)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  InvestmentPlatformService->>BrowserInvestmentRepository: updateOrder(Order)
-  BrowserInvestmentRepository->>browserDemoStore: readDemoStore()
-  BrowserInvestmentRepository->>browserDemoStore: writeDemoStore()
-  InvestmentPlatformService-->>controller: Order
-  controller-->>UI: Order completed
+```mermaid
+sequenceDiagram
+  actor Investor as Investor
+  participant UI as UI
+  participant OrderController as OrderController
+  participant Service as InvestmentPlatformService
+  participant Repo as AmplifyInvestmentRepository
+
+  Investor->>UI: register / login
+  Investor->>UI: open listing
+  Investor->>UI: start checkout
+  Investor->>UI: place order
+  UI->>OrderController: placeOrder(investorId, listingId, productId, quantity, investorWalletAddress)
+  OrderController->>Service: startOrder(...)
+  Service->>Repo: getUserProfileById(investorId)
+  Repo-->>Service: UserProfile
+  Service->>Repo: getListingById(listingId)
+  Repo-->>Service: Listing
+  Service->>Repo: getProductById(productId)
+  Repo-->>Service: Product
+  Service->>Repo: getAssetById(listing.assetId)
+  Repo-->>Service: Asset
+  Service->>Repo: createOrder(Order status=PENDING_PAYMENT)
+  Repo-->>Service: Order
+  OrderController-->>UI: Order
+
+  Investor->>UI: complete payment
+  UI->>OrderController: completeOrder(orderId)
+  OrderController->>Service: completeOrderPayment(orderId)
+  Service->>Repo: getOrderById(orderId)
+  Repo-->>Service: Order
+  Service->>Repo: getProductById(order.productId)
+  Repo-->>Service: Product
+  Service->>Repo: updateProduct(Product)
+  Repo-->>Service: Product
+  Service->>Repo: updateOrder(Order status=COMPLETED)
+  Repo-->>Service: Order
+  OrderController-->>UI: Order
 ```

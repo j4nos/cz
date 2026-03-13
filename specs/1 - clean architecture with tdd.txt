@@ -9,8 +9,8 @@ A tesztek fussanak le.
 Használj vitest-et.
 Fontos, hogy ezt a mintát, ami jelenleg van az Amplify-ban, ezt kövessük itt ezt a GraphQL-es mintát.
 Tehát az üzleti logika az a frontenden legyen.
-A befektetési platform úgy működik, hogy az asset provider regisztrál, majd létrehozza az assetet, listinget, produktot.
-Majd jön az investor, ő is regisztrál, kiválasztja a listinget, elindít egy ordert, kifizeti egy pénzügyi szolgáltató oldalán a fizetést, majd ezáltal befejeződik az order.
+A befektetési platform úgy működik, hogy a user regisztrál, es ugyanazzal a fiokkal asset providerkent letrehozza az assetet, listinget, produktot.
+Ezutan ugyanaz a user investor funkcioban ki tud valasztani egy listinget, elindit egy ordert, kifizeti egy penzugyi szolgaltato oldalan a fizetest, majd ezaltal befejezodik az order.
 
 Használd ez az ER-t:
 

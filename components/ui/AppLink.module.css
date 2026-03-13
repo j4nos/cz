@@ -1,0 +1,19 @@
+.link {
+  color: var(--color-black);
+  text-underline-offset: 3px;
+  text-decoration: underline;
+}
+
+.buttonLike {
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-black);
+  color: var(--color-white);
+  padding: 0.55rem 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+}

@@ -1,5 +1,21 @@
-import { ListingPageClient } from "@/components/ListingPageClient";
+import { notFound } from "next/navigation";
 
-export default function InvestorListingPage() {
-  return <ListingPageClient checkoutPath="/checkout" />;
+import { getPublicListingDetails } from "@/src/application/publicContent";
+import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
+import { InvestorListing } from "./InvestorListing";
+
+export default async function InvestorListingPage({ params }: { params: { listingId: string } }) {
+  const { listingWithAsset, products } = await getPublicListingDetails(createPublicContentReader(), params.listingId);
+
+  if (!listingWithAsset) {
+    notFound();
+  }
+
+  return (
+    <InvestorListing
+      listingId={params.listingId}
+      initialListingWithAsset={listingWithAsset}
+      initialProducts={products}
+    />
+  );
 }

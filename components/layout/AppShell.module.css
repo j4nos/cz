@@ -1,0 +1,40 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.mainRow {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  gap: 0;
+}
+
+.chatOpen {
+  gap: 8px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  max-width: calc(var(--container-width));
+  margin: 0 auto;
+  padding: 1.2rem 1rem;
+}
+
+.container {
+  max-width: var(--container-width);
+  margin: 0 auto;
+}
+
+@media (max-width: 960px) {
+  .main {
+    max-width: var(--container-width);
+  }
+
+  .chatOpen {
+    gap: 0;
+  }
+}

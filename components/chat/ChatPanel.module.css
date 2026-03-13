@@ -1,0 +1,108 @@
+.panel {
+  width: 300px;
+  flex: 0 0 300px;
+  position: sticky;
+  top: var(--header-height);
+  height: calc(95vh - var(--header-height) - var(--footer-height));
+  border: 1px solid #e9e9e9;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  margin: 4px;
+}
+
+.mobile {
+  position: static;
+  width: 100%;
+  flex-basis: auto;
+  height: calc(100vh - var(--header-height) - var(--footer-height) - 2.4rem);
+}
+
+.topBar,
+.threads,
+.compose {
+  padding: 0.6rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.topBar {
+  border-bottom: 1px solid #ededed;
+  justify-content: space-between;
+}
+
+.threads {
+  border-bottom: 1px solid #ededed;
+  flex-wrap: wrap;
+}
+
+.threadButton {
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  background: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.bubble {
+  padding: 0.4rem 0.7rem;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  width: fit-content;
+  max-width: 90%;
+}
+
+.ai {
+  background: #f2f2f2;
+}
+
+.client {
+  margin-left: auto;
+  background: var(--color-secondary);
+}
+
+.compose {
+  border-top: 1px solid #ededed;
+  flex-direction: column;
+}
+
+.composeRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.composeRow:first-child {
+  width: 100%;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  min-height: 96px;
+  resize: vertical;
+}
+
+.iconButton {
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  background: #fff;
+  height: 34px;
+  min-width: 34px;
+  font-size: 0.72rem;
+}

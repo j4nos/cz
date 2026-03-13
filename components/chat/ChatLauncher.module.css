@@ -1,0 +1,15 @@
+.launcher {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(var(--footer-height) + 1rem);
+  z-index: 50;
+  border: 0;
+  border-radius: 999px;
+  min-width: 92px;
+  height: 40px;
+  background: var(--color-black);
+  color: var(--color-white);
+  font-family: var(--font-body), sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+}

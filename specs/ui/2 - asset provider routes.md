@@ -1,12 +1,13 @@
 #### `/asset-provider`
 
-- Egyenlőre legyen üres.
+- Asset provider dashboard.
+- Mutasson gyors belépési pontokat legalább az assetekhez és az orderekhez.
 
 #### `/asset-provider/assets`
 
 - Egy PlainCta új asset létrehozásához.
 - Egy táblázat az assetekkel.
-  - A táblázat Firebase-ből a bejelentkezett asset providerhez tartozó asseteket mutassa.
+  - A táblázat a bejelentkezett asset providerhez tartozó asseteket mutassa a használt backend perzisztenciából.
     - A táblázatban legy button szerű link az assetre
 
 #### `/asset-provider/assets/new/step-1`
@@ -19,7 +20,7 @@
 
 - Wizard: media.
 - Lehessen fotót feltölteni.
-- A fotók Firebase-ben az asset ID + sorszám szerint tárolódjanak.
+- A fotók a használt backend storage-ban az asset ID + sorszám logikájával tárolódjanak.
 - Az asset tárolja, hány kép lett feltöltve.
 - Lehessen képfeltöltés nélkul is tovább lépni.
 
@@ -61,11 +62,11 @@
 
 #### `/asset-provider/assets/:assetId/create`
 
-- Használd ezt: `components/create-edit-listing.tsx`
+- Használd ezt: `components/CreateEditListing.tsx`
 
 #### `/asset-provider/assets/:assetId/listings/:listingId/edit`
 
-- Használd ezt: `components/create-edit-listing.tsx`
+- Használd ezt: `components/CreateEditListing.tsx`
 - Add át paraméterként a kapott listingId-t
 
 #### `/asset-provider/assets/:assetId/listings/:listingId/pricing`

@@ -1,4 +1,4 @@
-#### `components/navbar.tsx`
+#### `components/navigation/Navbar.tsx`
 
 - globális felső navigáció és auth-state alapú menümegjelenítés.
   - baloldalt: logo
@@ -14,7 +14,7 @@
 - Ha be van jelentkezve jobboldalt mutasson egy logout-ot
 - kijelentkezés után dobjon a nyitolapra
 
-#### `components/create-edit-listing.tsx`
+#### `components/CreateEditListing.tsx`
 
 - Listing attributumok.
 - Save Lsting button
@@ -33,10 +33,6 @@
 - Ha `edit`-rol lett betoltve, akkor a paraméterként kapott listingId-hoz kapcsolodó listinget toltsd be.
 - Ha `create`-rol lett betoltve, akkor generáljon egy listingId-t.
 - PlainCta: `Delete listing` button
-
-#### `components/settings-form.tsx`
-
-- beállítási űrlapkomponens.
 
 #### `components/listings.tsx`
 
@@ -66,7 +62,7 @@
     - `Go to Checkout`
 - Ha csak egy Product van, akkor ne legyen dropdown
 
-#### `components/SectionContainer.tsx`
+#### `components/sections/SectionContainer.tsx`
 
 - Egy section, aminek a kozepén van egy max 400px-es container, s ebbe jon a paraméterként kapott content
 

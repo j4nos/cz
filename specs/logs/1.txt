@@ -1,0 +1,139 @@
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.createAsset:start – {assetId: "id-1773427170727-ub2t8p", tenantUserId: "834408b2-a0a1-703f-0a6e-eba008763bfe", name: "Asset 3"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.createAsset:result – {assetId: "id-1773427170727-ub2t8p", tenantUserId: "834408b2-a0a1-703f-0a6e-eba008763bfe"}
+[Log] [ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:start – {assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:start – {assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.listListings – {count: 7, listingIds: Array, assetIds: Array}
+{count: 7, listingIds: Array, assetIds: Array}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.listListingsByAssetId – {assetId: "id-1773427170727-ub2t8p", totalListings: 7, filteredListings: 0, …}
+{assetId: "id-1773427170727-ub2t8p", totalListings: 7, filteredListings: 0, filteredIds: []}Object
+[Log] [ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:result – {assetId: "id-1773427170727-ub2t8p", assetFound: true, listingCount: 0, …}
+{assetId: "id-1773427170727-ub2t8p", assetFound: true, listingCount: 0, listingIds: [], listingAssetIds: []}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.listListings – {count: 7, listingIds: Array, assetIds: Array}
+{count: 7, listingIds: Array, assetIds: Array}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.listListingsByAssetId – {assetId: "id-1773427170727-ub2t8p", totalListings: 7, filteredListings: 0, …}
+{assetId: "id-1773427170727-ub2t8p", totalListings: 7, filteredListings: 0, filteredIds: []}Object
+[Log] [ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:result – {assetId: "id-1773427170727-ub2t8p", assetFound: true, listingCount: 0, …}
+{assetId: "id-1773427170727-ub2t8p", assetFound: true, listingCount: 0, listingIds: [], listingAssetIds: []}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:start – {assetId: "id-1773427170727-ub2t8p", listingId: null, generatedListingId: "listing-local-1773427181801", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: null, generatedListingId: "listing-local-1773427181801", productsVersion: 0}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:start – {assetId: "id-1773427170727-ub2t8p", listingId: null, generatedListingId: "listing-local-1773427181801", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: null, generatedListingId: "listing-local-1773427181801", productsVersion: 0}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:result – {assetId: "id-1773427170727-ub2t8p", listingId: null, assetFound: true, …}
+{assetId: "id-1773427170727-ub2t8p", listingId: null, assetFound: true, currentListingFound: false, currentListingAssetId: null}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:result – {assetId: "id-1773427170727-ub2t8p", listingId: null, assetFound: true, …}
+{assetId: "id-1773427170727-ub2t8p", listingId: null, assetFound: true, currentListingFound: false, currentListingAssetId: null}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.handleSave:start – {assetId: "id-1773427170727-ub2t8p", listingId: null, formId: "listing-local-1773427181801", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: null, formId: "listing-local-1773427181801", formAssetId: "id-1773427170727-ub2t8p", title: "Asset 31", …}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyListingController.createListingDraft:start – {assetId: "id-1773427170727-ub2t8p", title: "Asset 31", eligibility: "ANY", …}
+{assetId: "id-1773427170727-ub2t8p", title: "Asset 31", eligibility: "ANY", currency: "EUR", fromPrice: 1000, …}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.createListing:start – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", …}
+{listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", saleStatus: "OPEN"}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.createListing:result – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", saleStatus: "OPEN"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyListingController.createListingDraft:serviceResult – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", saleStatus: "OPEN"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.updateListing:start – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", …}
+{listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", saleStatus: "CLOSED"}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.updateListing:result – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", saleStatus: "CLOSED"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyListingController.createListingDraft:repositoryResult – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", saleStatus: "CLOSED"}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.handleSave:create:result – {requestedAssetId: "id-1773427170727-ub2t8p", createdListingId: "id-1773427193296-v95yei", createdAssetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:start – {assetId: "id-1773427170727-ub2t8p", listingId: null, generatedListingId: "listing-local-1773427181801", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: null, generatedListingId: "listing-local-1773427181801", productsVersion: 1}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:start – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", generatedListingId: "id-1773427193296-v95yei", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", generatedListingId: "id-1773427193296-v95yei", productsVersion: 0}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:start – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", generatedListingId: "id-1773427193296-v95yei", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", generatedListingId: "id-1773427193296-v95yei", productsVersion: 0}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:result – {assetId: "id-1773427170727-ub2t8p", listingId: null, assetFound: true, …}
+{assetId: "id-1773427170727-ub2t8p", listingId: null, assetFound: true, currentListingFound: false, currentListingAssetId: null}Object
+[Log] [PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.listProductsByListingId – {listingId: "id-1773427193296-v95yei", count: 0, productIds: [], …}
+{listingId: "id-1773427193296-v95yei", count: 0, productIds: [], names: []}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.loadProducts:result – {listingId: "id-1773427193296-v95yei", productCount: 0}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.listProductsByListingId – {listingId: "id-1773427193296-v95yei", count: 0, productIds: [], …}
+{listingId: "id-1773427193296-v95yei", count: 0, productIds: [], names: []}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.loadProducts:result – {listingId: "id-1773427193296-v95yei", productCount: 0}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:result – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", assetFound: true, …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", assetFound: true, currentListingFound: true, currentListingAssetId: "id-1773427170727-ub2t8p"}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.listProductsByListingId – {listingId: "id-1773427193296-v95yei", count: 0, productIds: [], …}
+{listingId: "id-1773427193296-v95yei", count: 0, productIds: [], names: []}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.loadProducts:result – {listingId: "id-1773427193296-v95yei", productCount: 0}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:result – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", assetFound: true, …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", assetFound: true, currentListingFound: true, currentListingAssetId: "id-1773427170727-ub2t8p"}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.handleSave:start – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", formId: "id-1773427193296-v95yei", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", formId: "id-1773427193296-v95yei", formAssetId: "id-1773427170727-ub2t8p", title: "Asset 31", …}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyListingController.saveListingDraft:start – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", …}
+{listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", saleStatus: "CLOSED"}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyListingController.saveListingDraft:existing – {listingId: "id-1773427193296-v95yei", exists: true, existingAssetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.updateListing:start – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", …}
+{listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", saleStatus: "CLOSED"}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.updateListing:result – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", saleStatus: "CLOSED"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyListingController.saveListingDraft:updateResult – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.handleSave:update:result – {requestedListingId: "id-1773427193296-v95yei", savedListingId: "id-1773427193296-v95yei", savedAssetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:start – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", generatedListingId: "id-1773427193296-v95yei", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", generatedListingId: "id-1773427193296-v95yei", productsVersion: 1}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:result – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", assetFound: true, …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", assetFound: true, currentListingFound: true, currentListingAssetId: "id-1773427170727-ub2t8p"}Object
+[Log] [PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.listProductsByListingId – {listingId: "id-1773427193296-v95yei", count: 0, productIds: [], …}
+{listingId: "id-1773427193296-v95yei", count: 0, productIds: [], names: []}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.loadProducts:result – {listingId: "id-1773427193296-v95yei", productCount: 0}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.handleSave:start – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", formId: "id-1773427193296-v95yei", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", formId: "id-1773427193296-v95yei", formAssetId: "id-1773427170727-ub2t8p", title: "Asset 31", …}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyListingController.saveListingDraft:start – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", …}
+{listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", saleStatus: "CLOSED"}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyListingController.saveListingDraft:existing – {listingId: "id-1773427193296-v95yei", exists: true, existingAssetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.updateListing:start – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", …}
+{listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", title: "Asset 31", saleStatus: "CLOSED"}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.updateListing:result – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p", saleStatus: "CLOSED"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyListingController.saveListingDraft:updateResult – {listingId: "id-1773427193296-v95yei", assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.handleSave:update:result – {requestedListingId: "id-1773427193296-v95yei", savedListingId: "id-1773427193296-v95yei", savedAssetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:start – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", generatedListingId: "id-1773427193296-v95yei", …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", generatedListingId: "id-1773427193296-v95yei", productsVersion: 2}Object
+[Log] [PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.listProductsByListingId – {listingId: "id-1773427193296-v95yei", count: 0, productIds: [], …}
+{listingId: "id-1773427193296-v95yei", count: 0, productIds: [], names: []}Object
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.loadProducts:result – {listingId: "id-1773427193296-v95yei", productCount: 0}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getListingById – {listingId: "id-1773427193296-v95yei", found: true, assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] CreateEditListingClient.load:result – {assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", assetFound: true, …}
+{assetId: "id-1773427170727-ub2t8p", listingId: "id-1773427193296-v95yei", assetFound: true, currentListingFound: true, currentListingAssetId: "id-1773427170727-ub2t8p"}Object
+[Log] [ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:start – {assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:start – {assetId: "id-1773427170727-ub2t8p"}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.listListings – {count: 8, listingIds: Array, assetIds: Array}
+{count: 8, listingIds: Array, assetIds: Array}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.listListingsByAssetId – {assetId: "id-1773427170727-ub2t8p", totalListings: 8, filteredListings: 1, …}
+{assetId: "id-1773427170727-ub2t8p", totalListings: 8, filteredListings: 1, filteredIds: ["id-1773427193296-v95yei"]}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById – {assetId: "id-1773427170727-ub2t8p", found: true}
+[Log] [ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:result – {assetId: "id-1773427170727-ub2t8p", assetFound: true, listingCount: 1, …}
+{assetId: "id-1773427170727-ub2t8p", assetFound: true, listingCount: 1, listingIds: ["id-1773427193296-v95yei"], listingAssetIds: ["id-1773427170727-ub2t8p"]}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.listListings – {count: 8, listingIds: Array, assetIds: Array}
+{count: 8, listingIds: Array, assetIds: Array}Object
+[Log] [ASSET_LISTING_DEBUG] AmplifyReadController.listListingsByAssetId – {assetId: "id-1773427170727-ub2t8p", totalListings: 8, filteredListings: 1, …}
+{assetId: "id-1773427170727-ub2t8p", totalListings: 8, filteredListings: 1, filteredIds: ["id-1773427193296-v95yei"]}Object
+[Log] [ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:result – {assetId: "id-1773427170727-ub2t8p", assetFound: true, listingCount: 1, …}
+{assetId: "id-1773427170727-ub2t8p", assetFound: true, listingCount: 1, listingIds: ["id-1773427193296-v95yei"], listingAssetIds: ["id-1773427170727-ub2t8p"]}Object

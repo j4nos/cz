@@ -1,0 +1,378 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import { PlainCta } from "@/components/sections/PlainCta";
+import { Button } from "@/components/ui/Button";
+import {
+  Form,
+  FormField,
+  FormInput,
+  FormSelect,
+} from "@/components/ui/Form";
+import { Table } from "@/components/ui/Table";
+import {
+  type PricingTier,
+  type ProductPricingState,
+} from "@/src/application/pricingState";
+import { createPricingController } from "@/src/infrastructure/controllers/createPricingController";
+
+type Props = {
+  assetId: string;
+  listingId: string;
+  mode: "create" | "edit";
+  preselectedProductId?: string;
+  redirectAfterDelete?: string;
+};
+
+export function PricingEditor({
+  assetId,
+  listingId,
+  mode,
+  preselectedProductId,
+  redirectAfterDelete,
+}: Props) {
+  const router = useRouter();
+  const [state, setState] = useState<ProductPricingState | null>(null);
+  const [minQuantity, setMinQuantity] = useState("1");
+  const [discountPercent, setDiscountPercent] = useState("0");
+  const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      const controller = createPricingController();
+      console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.load:start", {
+        listingId,
+        preselectedProductId: preselectedProductId ?? null,
+        mode,
+      });
+      const nextState = await controller.loadPricingState(
+        listingId,
+        preselectedProductId
+      );
+      console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.load:result", {
+        listingId: nextState.listingId,
+        productId: nextState.productId ?? null,
+        name: nextState.name,
+        currency: nextState.currency,
+        unitPrice: nextState.unitPrice,
+        tierCount: nextState.tiers.length,
+      });
+      setState(mode === "create" ? { ...nextState, productId: "" } : nextState);
+    }
+
+    void load();
+  }, [listingId, mode, preselectedProductId]);
+
+  function updateField<Key extends keyof ProductPricingState>(
+    key: Key,
+    value: ProductPricingState[Key]
+  ) {
+    setState((current) => (current ? { ...current, [key]: value } : current));
+  }
+
+  async function handleSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!state) {
+      return;
+    }
+
+    console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.handleSave:start", {
+      listingId: state.listingId,
+      productId: state.productId ?? null,
+      name: state.name,
+      currency: state.currency,
+      unitPrice: state.unitPrice,
+      minPurchase: state.minPurchase,
+      maxPurchase: state.maxPurchase,
+      eligibleInvestorType: state.eligibleInvestorType,
+      supplyTotal: state.supplyTotal,
+      tierCount: state.tiers.length,
+    });
+
+    try {
+      setError("");
+      const saved = await createPricingController().savePricingState(state);
+      console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.handleSave:result", {
+        listingId: saved.listingId,
+        productId: saved.productId ?? null,
+        name: saved.name,
+        currency: saved.currency,
+        unitPrice: saved.unitPrice,
+        tierCount: saved.tiers.length,
+      });
+      setState(saved);
+      setStatusMessage(saved.productId ? "Product saved." : "Product created.");
+      if (saved.productId) {
+        router.replace(
+          `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${saved.productId}`
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cannot save product.");
+    }
+  }
+
+  function handleAddTier(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!state) {
+      return;
+    }
+
+    const nextMinQuantity = Number(minQuantity);
+    const nextDiscountPercent = Number(discountPercent);
+
+    if (nextMinQuantity <= 0 || nextDiscountPercent < 0) {
+      setError("Tier values are invalid.");
+      return;
+    }
+
+    const tier: PricingTier = {
+      id: `${state.listingId}-tier-${Date.now()}`,
+      minQuantity: nextMinQuantity,
+      discountPercent: nextDiscountPercent,
+    };
+
+    console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.handleAddTier", {
+      listingId: state.listingId,
+      productId: state.productId ?? null,
+      tier,
+    });
+
+    setState((current) =>
+      current ? { ...current, tiers: [...current.tiers, tier] } : current
+    );
+    setMinQuantity("1");
+    setDiscountPercent("0");
+    setStatusMessage("Pricing tier added.");
+  }
+
+  function handleRemoveTier(tierId: string) {
+    console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.handleRemoveTier", {
+      listingId: state?.listingId ?? null,
+      productId: state?.productId ?? null,
+      tierId,
+    });
+    setState((current) =>
+      current
+        ? {
+            ...current,
+            tiers: current.tiers.filter((tier) => tier.id !== tierId),
+          }
+        : current
+    );
+    setStatusMessage("Pricing tier removed.");
+  }
+
+  async function handleDeleteProduct(
+    event: React.MouseEvent<HTMLAnchorElement>
+  ) {
+    event.preventDefault();
+    if (!state?.productId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this product? Pricing tiers will be removed too."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError("");
+      await createPricingController().deleteProduct(state.productId);
+      router.push(
+        redirectAfterDelete ??
+          `/asset-provider/assets/${assetId}/listings/${listingId}/edit`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cannot delete product.");
+    }
+  }
+
+  if (!state) {
+    return (
+      <section>
+        <h1>Pricing tiers</h1>
+        <p>Loading...</p>
+      </section>
+    );
+  }
+
+  return (
+    <div className="vertical-stack-with-gap">
+      <header>
+        <h1>Pricing tiers</h1>
+        <p className="muted">Listing: {listingId}</p>
+      </header>
+
+      <section>
+        {error ? <p className="muted">{error}</p> : null}
+        {statusMessage ? <p className="muted">{statusMessage}</p> : null}
+        <Form onSubmit={handleSave}>
+          <FormField label="Name" htmlFor="product-name">
+            <FormInput
+              id="product-name"
+              value={state.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              required
+            />
+          </FormField>
+          <FormField label="Currency" htmlFor="product-currency">
+            <FormSelect
+              id="product-currency"
+              value={state.currency}
+              options={[
+                { value: "EUR", label: "EUR" },
+                { value: "USD", label: "USD" },
+              ]}
+              onChange={(event) => updateField("currency", event.target.value)}
+            />
+          </FormField>
+          <FormField label="Unit price" htmlFor="product-price">
+            <FormInput
+              id="product-price"
+              type="number"
+              min="0"
+              value={String(state.unitPrice)}
+              onChange={(event) =>
+                updateField("unitPrice", Number(event.target.value))
+              }
+              required
+            />
+          </FormField>
+          <FormField label="Min purchase" htmlFor="product-min">
+            <FormInput
+              id="product-min"
+              type="number"
+              min="1"
+              value={String(state.minPurchase)}
+              onChange={(event) =>
+                updateField("minPurchase", Number(event.target.value))
+              }
+              required
+            />
+          </FormField>
+          <FormField label="Max purchase" htmlFor="product-max">
+            <FormInput
+              id="product-max"
+              type="number"
+              min={String(state.minPurchase || 1)}
+              value={String(state.maxPurchase)}
+              onChange={(event) =>
+                updateField("maxPurchase", Number(event.target.value))
+              }
+              required
+            />
+          </FormField>
+          <FormField label="Eligible investor" htmlFor="product-eligibility">
+            <FormSelect
+              id="product-eligibility"
+              value={state.eligibleInvestorType}
+              options={[
+                { value: "ANY", label: "Any" },
+                { value: "PROFESSIONAL", label: "Professional" },
+                { value: "RETAIL", label: "Retail" },
+              ]}
+              onChange={(event) =>
+                updateField("eligibleInvestorType", event.target.value)
+              }
+            />
+          </FormField>
+          <FormField label="Supply total" htmlFor="product-supply-total">
+            <FormInput
+              id="product-supply-total"
+              type="number"
+              min="1"
+              value={String(state.supplyTotal)}
+              onChange={(event) =>
+                updateField("supplyTotal", Number(event.target.value))
+              }
+              required
+            />
+          </FormField>
+          <Button type="submit">
+            {state.productId ? "Save product" : "Create product"}
+          </Button>
+        </Form>
+
+        <br />
+
+        <Form onSubmit={handleAddTier}>
+          <FormField label="Min quantity" htmlFor="pricing-min">
+            <FormInput
+              id="pricing-min"
+              type="number"
+              min="1"
+              value={minQuantity}
+              onChange={(event) => setMinQuantity(event.target.value)}
+            />
+          </FormField>
+          <FormField
+            label="Discounted unit price"
+            htmlFor="pricing-discount"
+          >
+            <FormInput
+              id="pricing-discount"
+              type="number"
+              min="0"
+              value={discountPercent}
+              onChange={(event) => setDiscountPercent(event.target.value)}
+            />
+          </FormField>
+          <Button type="submit">Add tier</Button>
+        </Form>
+      </section>
+
+      <section>
+        <h3>Existing tiers</h3>
+        <Table>
+          <thead>
+            <tr>
+              <th>Min qty</th>
+              <th>Price</th>
+              <th>Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.tiers.map((tier) => (
+              <tr key={tier.id}>
+                <td>{tier.minQuantity}</td>
+                <td>{tier.discountPercent}</td>
+                <td>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => handleRemoveTier(tier.id)}
+                  >
+                    Remove
+                  </Button>
+                </td>
+              </tr>
+            ))}
+            {state.tiers.length === 0 ? (
+              <tr>
+                <td colSpan={3}>No tiers yet.</td>
+              </tr>
+            ) : null}
+          </tbody>
+        </Table>
+      </section>
+
+      {state.productId ? (
+        <section>
+          <PlainCta
+            title="Delete product"
+            text="Removes the selected product and all its pricing tiers."
+            actionLabel="DELETE PRODUCT"
+            href="#"
+            onClick={handleDeleteProduct}
+          />
+        </section>
+      ) : null}
+    </div>
+  );
+}

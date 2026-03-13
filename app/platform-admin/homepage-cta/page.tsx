@@ -1,31 +1,122 @@
-export default function HomepageCtaPage() {
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { generateClient } from "aws-amplify/data";
+
+import { Button } from "@/components/ui/Button";
+import { Form, FormField, FormInput } from "@/components/ui/Form";
+import { useToast } from "@/contexts/ToastContext";
+import type { Schema } from "@/amplify/data/resource";
+import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+
+export default function PlatformAdminHomepageCtaPage() {
+  const client = useMemo(() => {
+    ensureAmplifyConfigured();
+    return generateClient<Schema>();
+  }, []);
+  const [firstAssetId, setFirstAssetId] = useState("");
+  const [firstListingId, setFirstListingId] = useState("");
+  const [secondAssetId, setSecondAssetId] = useState("");
+  const [secondListingId, setSecondListingId] = useState("");
+  const { setToast } = useToast();
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await client.models.PlatformSettings.get({
+        id: "homepage",
+      });
+      if (data?.homepageFirstAssetId) {
+        setFirstAssetId(data.homepageFirstAssetId);
+      }
+      if (data?.homepageFirstListingId) {
+        setFirstListingId(data.homepageFirstListingId);
+      }
+      if (data?.homepageSecondAssetId) {
+        setSecondAssetId(data.homepageSecondAssetId);
+      }
+      if (data?.homepageSecondListingId) {
+        setSecondListingId(data.homepageSecondListingId);
+      }
+    }
+
+    void load();
+  }, [client]);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const existing = await client.models.PlatformSettings.get({
+      id: "homepage",
+    });
+
+    if (existing.data) {
+      await client.models.PlatformSettings.update({
+        id: "homepage",
+        homepageFirstAssetId: firstAssetId,
+        homepageFirstListingId: firstListingId,
+        homepageSecondAssetId: secondAssetId,
+        homepageSecondListingId: secondListingId,
+        updatedByUserId: "platform-admin",
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      await client.models.PlatformSettings.create({
+        id: "homepage",
+        homepageFirstAssetId: firstAssetId,
+        homepageFirstListingId: firstListingId,
+        homepageSecondAssetId: secondAssetId,
+        homepageSecondListingId: secondListingId,
+        updatedByUserId: "platform-admin",
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    setToast("Setting saved", "success", 2000);
+  }
+
   return (
-    <section>
-      <h1>Homepage CTA settings</h1>
-      <form>
-        <fieldset>
-          <legend>First CTA</legend>
-          <label>
-            Asset ID
-            <input defaultValue="asset-1" type="text" />
-          </label>
-          <label>
-            Listing ID
-            <input defaultValue="listing-1" type="text" />
-          </label>
-        </fieldset>
-        <fieldset>
-          <legend>Second CTA</legend>
-          <label>
-            Asset ID
-            <input defaultValue="asset-2" type="text" />
-          </label>
-          <label>
-            Listing ID
-            <input defaultValue="listing-2" type="text" />
-          </label>
-        </fieldset>
-      </form>
-    </section>
+    <div className="vertical-stack-with-gap">
+      <header>
+        <h1>Homepage CTA</h1>
+        <p className="muted">Configure the two featured listing links.</p>
+      </header>
+      <>
+        <Form onSubmit={handleSubmit}>
+          <FormField label="First assetId" htmlFor="cta-first-asset">
+            <FormInput
+              id="cta-first-asset"
+              value={firstAssetId}
+              onChange={(event) => setFirstAssetId(event.target.value)}
+              placeholder="asset id"
+            />
+          </FormField>
+          <FormField label="First listingId" htmlFor="cta-first-listing">
+            <FormInput
+              id="cta-first-listing"
+              value={firstListingId}
+              onChange={(event) => setFirstListingId(event.target.value)}
+              placeholder="listing id"
+            />
+          </FormField>
+          <FormField label="Second assetId" htmlFor="cta-second-asset">
+            <FormInput
+              id="cta-second-asset"
+              value={secondAssetId}
+              onChange={(event) => setSecondAssetId(event.target.value)}
+              placeholder="asset id"
+            />
+          </FormField>
+          <FormField label="Second listingId" htmlFor="cta-second-listing">
+            <FormInput
+              id="cta-second-listing"
+              value={secondListingId}
+              onChange={(event) => setSecondListingId(event.target.value)}
+              placeholder="listing id"
+            />
+          </FormField>
+          <Button type="submit">Save</Button>
+        </Form>
+      </>
+    </div>
   );
 }

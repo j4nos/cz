@@ -33,7 +33,7 @@ export class InvestmentPlatformService {
       country: input.country,
       investorType: input.investorType,
       companyName: input.companyName,
-      kycStatus: "APPROVED",
+      kycStatus: "approved",
       createdAt: timestamp,
       updatedAt: timestamp,
     });
@@ -46,8 +46,7 @@ export class InvestmentPlatformService {
     assetClass: string;
     tokenStandard?: string;
   }): Promise<Asset> {
-    const provider = await this.requireUser(input.tenantUserId);
-    this.ensureRole(provider, "ASSET_PROVIDER", "Only asset providers can create assets.");
+    await this.requireUser(input.tenantUserId);
 
     return this.repository.createAsset({
       id: this.idGenerator.next(),
@@ -56,7 +55,7 @@ export class InvestmentPlatformService {
       country: input.country,
       assetClass: input.assetClass,
       tokenStandard: input.tokenStandard,
-      status: "DRAFT",
+      status: "draft",
       missingDocsCount: 0,
       imageUrls: [],
     });
@@ -73,8 +72,7 @@ export class InvestmentPlatformService {
     endsAt?: string;
   }): Promise<Listing> {
     const asset = await this.requireAsset(input.assetId);
-    const provider = await this.requireUser(asset.tenantUserId);
-    this.ensureRole(provider, "ASSET_PROVIDER", "Only asset providers can create listings.");
+    await this.requireUser(asset.tenantUserId);
 
     return this.repository.createListing({
       id: this.idGenerator.next(),
@@ -85,7 +83,7 @@ export class InvestmentPlatformService {
       eligibility: input.eligibility,
       currency: input.currency,
       fromPrice: input.fromPrice,
-      saleStatus: "OPEN",
+      saleStatus: "open",
       startsAt: input.startsAt,
       endsAt: input.endsAt,
     });
@@ -130,17 +128,13 @@ export class InvestmentPlatformService {
     listingId: string;
     productId: string;
     quantity: number;
+    paymentProvider?: string;
     investorWalletAddress?: string;
   }): Promise<Order> {
     const investor = await this.requireUser(input.investorId);
-    this.ensureRole(investor, "INVESTOR", "Only investors can start orders.");
-
-    if (investor.kycStatus !== "APPROVED") {
-      throw new DomainError("Investor KYC must be approved.");
-    }
 
     const listing = await this.requireListing(input.listingId);
-    if (listing.saleStatus !== "OPEN") {
+    if (listing.saleStatus !== "open") {
       throw new DomainError("Listing is not open for orders.");
     }
 
@@ -176,15 +170,16 @@ export class InvestmentPlatformService {
       quantity: input.quantity,
       unitPrice: product.unitPrice,
       total: product.unitPrice * input.quantity,
-      status: "PENDING_PAYMENT",
+      status: "pending",
       currency: product.currency,
+      paymentProvider: input.paymentProvider,
       investorWalletAddress: input.investorWalletAddress,
     });
   }
 
   async completeOrderPayment(input: { orderId: string }): Promise<Order> {
     const order = await this.requireOrder(input.orderId);
-    if (order.status !== "PENDING_PAYMENT") {
+    if (order.status !== "pending") {
       throw new DomainError("Only pending payment orders can be completed.");
     }
 
@@ -196,7 +191,7 @@ export class InvestmentPlatformService {
     product.remainingSupply -= order.quantity;
     await this.repository.updateProduct(product);
 
-    order.status = "COMPLETED";
+    order.status = "paid";
     return this.repository.updateOrder(order);
   }
 
@@ -243,11 +238,5 @@ export class InvestmentPlatformService {
     }
 
     return order;
-  }
-
-  private ensureRole(user: UserProfile, expectedRole: UserProfile["role"], message: string): void {
-    if (user.role !== expectedRole) {
-      throw new DomainError(message);
-    }
   }
 }

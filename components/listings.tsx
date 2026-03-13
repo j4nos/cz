@@ -1,32 +1,50 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { getController, type ListingWithAssetView } from "@/src/application/controller";
+import { Card } from "@/components/ui/Card";
+import { AppLink } from "@/components/ui/AppLink";
+import { listPublicListings, type PublicListingWithAsset } from "@/src/application/publicContent";
+import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
 
-export function Listings({ basePath = "/listings" }: { basePath?: string }) {
-  const [openListings, setOpenListings] = useState<ListingWithAssetView[]>([]);
+export function Listings({
+  basePath = "/listings",
+  initialEntries,
+}: {
+  basePath?: string;
+  initialEntries?: PublicListingWithAsset[];
+}) {
+  const [openListings, setOpenListings] = useState<PublicListingWithAsset[]>(initialEntries ?? []);
 
   useEffect(() => {
-    setOpenListings(getController().queries.listOpenListings());
-  }, []);
+    if (initialEntries) {
+      return;
+    }
+
+    async function load() {
+      setOpenListings(await listPublicListings(createPublicContentReader()));
+    }
+
+    void load();
+  }, [initialEntries]);
 
   return (
-    <section>
-      <h1>Listings</h1>
-      {openListings.map((listing) => (
-        <article key={listing.listing.id}>
-          {listing.asset?.imageUrls?.[0] ? (
-            <img alt={listing.asset.name} height={100} src={listing.asset.imageUrls[0]} width={100} />
-          ) : (
-            <div>No image</div>
-          )}
-          <h2>{listing.asset?.name ?? "Unknown asset"}</h2>
-          <p>From price: {listing.listing.fromPrice} {listing.listing.currency}</p>
-          <Link href={`${basePath}/${listing.listing.id}`}>Details</Link>
-        </article>
-      ))}
+    <section className="grid">
+        {openListings.map((entry) => (
+          <div key={entry.listing.id}>
+            <Card
+              body={`${entry.asset?.name ?? ""} ${entry.listing.currency} ${entry.listing.fromPrice}`.trim()}
+              cta={
+                <AppLink href={`${basePath}/${entry.listing.id}`} looksLikeButton>
+                  View Details
+                </AppLink>
+              }
+              imageSrc={entry.asset?.imageUrls?.[0]}
+              title={entry.listing.title}
+            />
+          </div>
+        ))}
+      {openListings.length === 0 ? <p className="muted">No listings yet.</p> : null}
     </section>
   );
 }

@@ -22,7 +22,9 @@
 ### Cross-route navigation and auth behavior
 
 - A Navbarban az `Asset Provider` és `Investor` menüelemek csak bejelentkezett állapotban látszódjanak.
+- Ugyanaz a bejelentkezett user egyszerre latja es hasznalja az `Asset Provider` es az `Investor` teruleteket.
 - A `Blog` menüpont mindig látszódjon (bejelentkezéstől függetlenül).
 - Ha nincs bejelentkezve user, a `Blog` és `Registration` menüpontok látszódjanak.
 - Ha be van jelentkezve user, a user neve és egy `Logout` gomb látszódjon.
 - Az `Asset Provider` menü alatt legyen: `Dashboard`, `Assets`, `Orders`, `Settings`.
+- Az `Investor` menü alatt legyen: `Dashboard`, `Listings`, `Orders`, `Portfolio`, `KYC`, `Settings`.

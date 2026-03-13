@@ -1,0 +1,25 @@
+.cta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: #fff;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.content p {
+  color: #4c4c4c;
+  max-width: 54ch;
+}
+
+@media (max-width: 760px) {
+  .cta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -17,6 +17,11 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
     return this.copyOrNull(this.userProfiles.get(id));
   }
 
+  async updateUserProfile(input: UserProfile): Promise<UserProfile> {
+    this.userProfiles.set(input.id, { ...input });
+    return { ...input };
+  }
+
   async createAsset(input: Asset): Promise<Asset> {
     this.assets.set(input.id, { ...input });
     return { ...input };
@@ -26,6 +31,15 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
     return this.copyOrNull(this.assets.get(id));
   }
 
+  async updateAsset(asset: Asset): Promise<Asset> {
+    this.assets.set(asset.id, { ...asset });
+    return { ...asset };
+  }
+
+  async deleteAsset(assetId: string): Promise<void> {
+    this.assets.delete(assetId);
+  }
+
   async createListing(input: Listing): Promise<Listing> {
     this.listings.set(input.id, { ...input });
     return { ...input };
@@ -33,6 +47,10 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
 
   async getListingById(id: string): Promise<Listing | null> {
     return this.copyOrNull(this.listings.get(id));
+  }
+
+  async deleteListing(listingId: string): Promise<void> {
+    this.listings.delete(listingId);
   }
 
   async createProduct(input: Product): Promise<Product> {
@@ -47,6 +65,10 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
   async updateProduct(product: Product): Promise<Product> {
     this.products.set(product.id, { ...product });
     return { ...product };
+  }
+
+  async deleteProduct(productId: string): Promise<void> {
+    this.products.delete(productId);
   }
 
   async createOrder(input: Order): Promise<Order> {

@@ -1,10 +1,13 @@
 import { notFound } from "next/navigation";
 
 import { BlogDetails } from "@/components/blog/BlogDetails";
-import { getBlogPostById } from "@/src/ui/queries";
+import { getPublicBlogPost } from "@/src/application/publicContent";
+import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
 
-export default function BlogDetailsPage({ params }: { params: { blogId: string } }) {
-  const post = getBlogPostById(params.blogId);
+export const revalidate = 60;
+
+export default async function BlogDetailsPage({ params }: { params: { blogId: string } }) {
+  const post = await getPublicBlogPost(createPublicContentReader(), params.blogId);
 
   if (!post) {
     notFound();

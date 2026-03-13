@@ -1,0 +1,24 @@
+.wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-white);
+}
+
+.table th,
+.table td {
+  padding: 0.8rem;
+  border-bottom: 1px solid #ececec;
+  font-size: 0.92rem;
+  text-align: left;
+}
+
+.table thead th {
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #666;
+}

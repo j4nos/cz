@@ -85,12 +85,12 @@ describe("InvestmentPlatformService", () => {
       investorWalletAddress: "0x123",
     });
 
-    expect(pendingOrder.status).toBe("PENDING_PAYMENT");
+    expect(pendingOrder.status).toBe("pending");
     expect(pendingOrder.total).toBe(3000);
 
     const completedOrder = await service.completeOrderPayment({ orderId: pendingOrder.id });
 
-    expect(completedOrder.status).toBe("COMPLETED");
+    expect(completedOrder.status).toBe("paid");
 
     const storedProduct = await repository.getProductById(product.id);
     expect(storedProduct?.remainingSupply).toBe(47);

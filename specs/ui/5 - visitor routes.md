@@ -15,15 +15,6 @@
 
 - Használd ezt: `components/listing.tsx`
 
-#### `/checkout`
-
-- Explicit checkout oldal.
-- A `Go to Checkout` gomb erre a route-ra navigáljon.
-- A page a kiválasztott listing/product alapján töltse be az adatokat.
-- A `Place Order` innen is az `/investor/orders/:orderId` oldalra vigyen.
-- Itt választja ki a fizetési típust.
-- Ha csak egy Product van, akkor ne legyen dropdown
-
 #### `/login`
 
 - Bejelentkezés.
@@ -35,12 +26,13 @@
 - Regisztráció.
 - Ha nincs bejelentkezve felhasználó, a Navbarban a `Registration` menüpont látszódjon.
 - Login és regisztrácio kozott lehessen keresztül navigálni.
-- Ne legyen role választo
-- Használd a `components/SectionContainer.tsx`-t
+- Minden user egyszerre asset provider és investor.
+- Használd a `components/sections/SectionContainer.tsx`-t
 
 #### `/settings`
 
-- Belépés role-specifikus beállításokhoz.
+- Belépés a felhasználó beállítási teruleteire.
+- A user innen el tudja érni mind az asset provider, mind az investor settings oldalakat.
 
 #### `/blog`
 

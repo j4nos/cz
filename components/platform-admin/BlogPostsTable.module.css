@@ -1,0 +1,10 @@
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.titleWrap {
+  display: grid;
+  gap: 0.2rem;
+}

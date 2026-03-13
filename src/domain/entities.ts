@@ -1,10 +1,22 @@
 export type UserRole = "ASSET_PROVIDER" | "INVESTOR";
 
-export type KycStatus = "PENDING" | "APPROVED";
+export type KycStatus =
+  | "not-started"
+  | "pending"
+  | "submitted"
+  | "approved"
+  | "rejected";
 
-export type SaleStatus = "DRAFT" | "OPEN" | "CLOSED";
+export type AssetStatus =
+  | "draft"
+  | "submitted"
+  | "approved"
+  | "pending"
+  | "closed";
 
-export type OrderStatus = "PENDING_PAYMENT" | "COMPLETED";
+export type SaleStatus = "draft" | "open" | "closed";
+
+export type OrderStatus = "pending" | "paid" | "cancelled" | "failed";
 
 export interface UserProfile {
   id: string;
@@ -24,8 +36,10 @@ export interface Asset {
   name: string;
   country: string;
   assetClass: string;
+  beneficiaryIban?: string;
+  beneficiaryLabel?: string;
   tokenStandard?: string;
-  status: string;
+  status: AssetStatus;
   missingDocsCount: number;
   tokenAddress?: string;
   latestRunId?: string;
@@ -65,10 +79,29 @@ export interface Order {
   providerUserId: string;
   listingId: string;
   productId: string;
+  productName?: string;
   quantity: number;
   unitPrice: number;
+  baseUnitPrice?: number;
+  discountPctApplied?: number;
+  effectiveUnitPrice?: number;
+  description?: string;
   total: number;
   status: OrderStatus;
   currency: string;
+  paymentProvider?: string;
+  paymentProviderId?: string;
+  paymentProviderStatus?: string;
+  coupon?: string;
+  requiresProviderConfirmation?: boolean;
+  createdAt?: string;
+  withdrawnAt?: string;
+  providerConfirmedBy?: string;
+  providerConfirmedAt?: string;
   investorWalletAddress?: string;
+  mintRequestedAt?: string;
+  mintingAt?: string;
+  mintTxHash?: string;
+  mintError?: string;
+  mintedAt?: string;
 }

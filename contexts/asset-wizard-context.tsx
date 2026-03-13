@@ -10,6 +10,7 @@ import {
 } from "react";
 
 export interface AssetWizardState {
+  assetId: string;
   name: string;
   country: string;
   assetClass: string;
@@ -27,10 +28,11 @@ interface AssetWizardContextValue {
 const STORAGE_KEY = "cityzeen.asset-wizard";
 
 const defaultState: AssetWizardState = {
+  assetId: "",
   name: "",
   country: "",
   assetClass: "REAL_ESTATE",
-  tokenStandard: "ERC-3643",
+  tokenStandard: "ERC-20",
   photos: [],
   documents: [],
 };
@@ -48,7 +50,14 @@ export function AssetWizardProvider({ children }: { children: ReactNode }) {
 
     try {
       const parsed = JSON.parse(raw) as AssetWizardState;
-      setState({ ...defaultState, ...parsed });
+      setState({
+        ...defaultState,
+        ...parsed,
+        tokenStandard:
+          parsed.tokenStandard === "ERC-20" || parsed.tokenStandard === "ERC-721"
+            ? parsed.tokenStandard
+            : defaultState.tokenStandard,
+      });
     } catch {
       window.sessionStorage.removeItem(STORAGE_KEY);
     }

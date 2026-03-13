@@ -1,5 +1,124 @@
-import { SettingsForm } from "@/components/settings-form";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/contexts/ToastContext";
 
 export default function InvestorSettingsPage() {
-  return <SettingsForm role="Investor" />;
+  const { user, profile, logout, accessToken } = useAuth();
+  const router = useRouter();
+  const { setToast } = useToast();
+  const [country, setCountry] = useState(profile?.country ?? "");
+  const [investorType, setInvestorType] = useState(
+    profile?.investorType ?? "retail"
+  );
+  const [companyName, setCompanyName] = useState(profile?.companyName ?? "");
+
+  useEffect(() => {
+    setCountry(profile?.country ?? "");
+    setInvestorType(profile?.investorType ?? "retail");
+    setCompanyName(profile?.companyName ?? "");
+  }, [profile]);
+
+  if (!user || !profile) {
+    return <p className="muted">Login to manage settings.</p>;
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user || !profile) {
+      return;
+    }
+    const email = user.email;
+    const role = profile.role;
+    if (!email || !role) {
+      return;
+    }
+
+    await (await import("@/src/infrastructure/auth/createAuthClient"))
+      .createAuthClient()
+      .upsertUserProfile({
+        uid: user.uid,
+        email,
+        role,
+        country,
+        investorType,
+        companyName,
+        kycStatus: profile.kycStatus,
+      });
+    setToast("Setting saved", "success", 2000);
+  }
+
+  async function handleDeleteAccount() {
+    if (!user) return;
+    const confirmed = window.confirm(
+      "Delete your account and profile? This cannot be undone."
+    );
+    if (!confirmed) return;
+    try {
+      if (!accessToken) {
+        throw new Error("Missing access token.");
+      }
+      const response = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Delete failed.");
+      }
+      await logout();
+      router.push("/");
+      setToast("Account deleted.", "success", 2500);
+    } catch (error) {
+      setToast("Failed to delete account.", "danger", 2500);
+    }
+  }
+
+  return (
+    <div className="vertical-stack-with-gap">
+      <header>
+        <h1>Investor Settings</h1>
+        <p className="muted">Update your profile and investor type.</p>
+      </header>
+      <>
+        <Form onSubmit={handleSubmit}>
+          <FormField label="Country" htmlFor="settings-country">
+            <FormInput
+              id="settings-country"
+              value={country}
+              onChange={(event) => setCountry(event.target.value)}
+            />
+          </FormField>
+          <FormField label="Investor type" htmlFor="settings-investor-type">
+            <FormSelect
+              id="settings-investor-type"
+              value={investorType}
+              options={[
+                { value: "retail", label: "Retail" },
+                { value: "accredited", label: "Accredited" },
+              ]}
+              onChange={(event) => setInvestorType(event.target.value)}
+            />
+          </FormField>
+          <FormField label="Company name" htmlFor="settings-company">
+            <FormInput
+              id="settings-company"
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
+            />
+          </FormField>
+          <Button type="submit">Save</Button>
+        </Form>
+        <Button type="button" variant="ghost" onClick={handleDeleteAccount}>
+          Delete account
+        </Button>
+      </>
+    </div>
+  );
 }
