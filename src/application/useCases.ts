@@ -58,15 +58,19 @@ export class InvestmentPlatformService {
       tokenStandard: input.tokenStandard,
       status: "DRAFT",
       missingDocsCount: 0,
+      imageUrls: [],
     });
   }
 
   async createListing(input: {
     assetId: string;
     title: string;
+    description: string;
     eligibility: string;
     currency: string;
     fromPrice: number;
+    startsAt?: string;
+    endsAt?: string;
   }): Promise<Listing> {
     const asset = await this.requireAsset(input.assetId);
     const provider = await this.requireUser(asset.tenantUserId);
@@ -76,11 +80,14 @@ export class InvestmentPlatformService {
       id: this.idGenerator.next(),
       assetId: input.assetId,
       title: input.title,
+      description: input.description,
       assetClass: asset.assetClass,
       eligibility: input.eligibility,
       currency: input.currency,
       fromPrice: input.fromPrice,
       saleStatus: "OPEN",
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
     });
   }
 

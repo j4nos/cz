@@ -18,7 +18,7 @@ Használd ez az ER-t:
 
 Tégy ide egy mermaid sequence user flow-t:
 
-/Users/kukodajanos/Workspace/cityzeen-tdd/specs/3 - basic investment flow.md
+/Users/kukodajanos/Workspace/cityzeen-tdd/specs/3 - investment service test flow.md
 
 Használd a kódban használt elnevezéseket.
 Speciális karaktert ne használj.

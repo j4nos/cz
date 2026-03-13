@@ -29,17 +29,21 @@ export interface Asset {
   missingDocsCount: number;
   tokenAddress?: string;
   latestRunId?: string;
+  imageUrls: string[];
 }
 
 export interface Listing {
   id: string;
   assetId: string;
   title: string;
+  description: string;
   assetClass: string;
   eligibility: string;
   currency: string;
   fromPrice: number;
   saleStatus: SaleStatus;
+  startsAt?: string;
+  endsAt?: string;
 }
 
 export interface Product {

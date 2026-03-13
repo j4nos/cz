@@ -1,0 +1,2 @@
+- `app/layout.tsx` - app-szintű közös layout.
+- `app/asset-provider/assets/new/layout.tsx` - create-asset wizard közös layout, step kiemeléssel.

@@ -46,12 +46,17 @@ describe("InvestmentPlatformService", () => {
       tokenStandard: "ERC-3643",
     });
 
+    expect(asset.imageUrls).toEqual([]);
+
     const listing = await service.createListing({
       assetId: asset.id,
       title: "Budapest Office Seed Listing",
+      description: "Seed round for a Budapest office redevelopment.",
       eligibility: "PROFESSIONAL",
       currency: "EUR",
       fromPrice: 1000,
+      startsAt: "2026-03-01",
+      endsAt: "2026-03-31",
     });
 
     const product = await service.createProduct({

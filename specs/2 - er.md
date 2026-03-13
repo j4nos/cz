@@ -40,6 +40,7 @@ erDiagram
     int missingDocsCount
     string tokenAddress
     string latestRunId
+    string[] imageUrls
   }
 
   Listing {

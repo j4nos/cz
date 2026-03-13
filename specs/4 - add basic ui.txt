@@ -1,0 +1,10 @@
+Nézd végig a projektet, 
+Olvasd el a specs-ben a specifikációt. 
+Adjuk hozzá a UI page-eket, de semmi stílust ne adjunk hozzá.
+Teljesen minimál HTML elemeket használjunk csak, és kössük be, hogy végig lehessen menni az investment flow-n.
+Ahol kuloso komponenes van, pl. payment provider, ott használj egy fake provider-t egyenlore.
+
+Ebben a konyvtárban levő specifikáciok alapján hozzzunk létre a route-okat, komponenseket:
+/Users/kukodajanos/Workspace/cityzeen-tdd/specs/ui
+
+Nem kell mindegyket létrehozni, csam ami szükséges, azt valósitsd meg, de minimális implementációval.
