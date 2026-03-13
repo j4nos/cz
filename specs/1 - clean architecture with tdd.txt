@@ -1,0 +1,26 @@
+Nézd végig az appot, ez egy Next.js Amplify app.
+Van benne egy  default todo implementácio is, ami ugye a GraphQL-t használja. Ezt most cseréljük le.
+Egy befektetési platformot csinálunk rajta, de TDD-vel, test-driven developmenttel, clean architecture-vel.
+Add hozzá a domain-t és a usecase-eket.
+Ezek most frontenden lesznek.
+A basic investment flow-t készítsd el és a miniálisan szükséges implementációt.
+UI implementációt ne adj hozzá, csak a domaint és a usecase-eket.
+A tesztek fussanak le.
+Használj vitest-et.
+Fontos, hogy ezt a mintát, ami jelenleg van az Amplify-ban, ezt kövessük itt ezt a GraphQL-es mintát.
+Tehát az üzleti logika az a frontenden legyen.
+A befektetési platform úgy működik, hogy az asset provider regisztrál, majd létrehozza az assetet, listinget, produktot.
+Majd jön az investor, ő is regisztrál, kiválasztja a listinget, elindít egy ordert, kifizeti egy pénzügyi szolgáltató oldalán a fizetést, majd ezáltal befejeződik az order.
+
+Használd ez az ER-t:
+
+/Users/kukodajanos/Workspace/cityzeen-tdd/specs/2 - er.md
+
+Tégy ide egy mermaid sequence user flow-t:
+
+/Users/kukodajanos/Workspace/cityzeen-tdd/specs/3 - basic investment flow.md
+
+Használd a kódban használt elnevezéseket.
+Speciális karaktert ne használj.
+
+A teszt fusson le a végén sikeresen.

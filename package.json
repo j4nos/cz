@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.5.5",
@@ -26,6 +27,7 @@
     "constructs": "^10.3.0",
     "esbuild": "^0.23.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^3.2.4"
   }
 }
