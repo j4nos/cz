@@ -1,7 +1,7 @@
 "use client";
 
 import { Listing } from "@/components/listing";
-import type { PublicListingWithAsset } from "@/src/application/publicContent";
+import type { PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
 import type { Product } from "@/src/domain/entities";
 
 type Props = {

@@ -17,5 +17,6 @@ export interface InvestmentRepository {
   deleteProduct(productId: string): Promise<void>;
   createOrder(input: Order): Promise<Order>;
   getOrderById(id: string): Promise<Order | null>;
+  findOrderByPaymentProviderId(paymentProviderId: string): Promise<Order | null>;
   updateOrder(order: Order): Promise<Order>;
 }

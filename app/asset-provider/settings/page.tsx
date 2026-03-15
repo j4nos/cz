@@ -1,16 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
+import { AccountSettingsService } from "@/src/application/use-cases/accountSettingsService";
+import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
 
 export default function AssetProviderSettingsPage() {
   const { user, profile, logout, accessToken } = useAuth();
   const router = useRouter();
   const { setToast } = useToast();
+  const accountSettingsService = useMemo(
+    () =>
+      new AccountSettingsService(
+        createAuthClient(),
+        async (currentAccessToken) => {
+          const response = await fetch("/api/account/delete", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${currentAccessToken}`,
+            },
+          });
+          if (!response.ok) {
+            throw new Error("Delete failed.");
+          }
+        },
+      ),
+    [],
+  );
   const [companyName, setCompanyName] = useState(profile?.companyName ?? "");
   const [country, setCountry] = useState(profile?.country ?? "");
 
@@ -25,16 +46,17 @@ export default function AssetProviderSettingsPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await (await import("@/src/infrastructure/auth/createAuthClient"))
-      .createAuthClient()
-      .upsertUserProfile({
-        uid: user.uid,
-        email: profile.email,
-        role: profile.role,
+    try {
+      const result = await accountSettingsService.saveProviderSettings({
+        user,
+        profile,
         country,
         companyName,
       });
-    setToast("Setting saved", "success", 2000);
+      setToast(result.message, result.kind === "success" ? "success" : "danger", 2000);
+    } catch {
+      setToast("Failed to save settings.", "danger", 2000);
+    }
   }
 
   async function handleDeleteAccount() {
@@ -44,23 +66,15 @@ export default function AssetProviderSettingsPage() {
     );
     if (!confirmed) return;
     try {
-      if (!accessToken) {
-        throw new Error("Missing access token.");
-      }
-      const response = await fetch("/api/account/delete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Delete failed.");
+      const result = await accountSettingsService.deleteAccount(accessToken);
+      if (result.kind === "error") {
+        setToast(result.message, "danger", 2500);
+        return;
       }
       await logout();
       router.push("/");
-      setToast("Account deleted.", "success", 2500);
-    } catch (error) {
+      setToast(result.message, "success", 2500);
+    } catch {
       setToast("Failed to delete account.", "danger", 2500);
     }
   }

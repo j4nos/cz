@@ -1,7 +1,7 @@
 import { Listing } from "@/components/listing";
 import {
   listPublicListings,
-} from "@/src/application/publicContent";
+} from "@/src/application/use-cases/publicContent";
 import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
 import { notFound } from "next/navigation";
 

@@ -1,6 +1,6 @@
-import type { BlogPost } from "@/src/domain/content";
+import type { BlogPost } from "@/src/domain/entities/content";
 import type { Product } from "@/src/domain/entities";
-import type { PublicContentReader, PublicListingWithAsset } from "@/src/application/publicContent";
+import type { PublicContentReader, PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
 import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
 export class AmplifyPublicContentReader implements PublicContentReader {

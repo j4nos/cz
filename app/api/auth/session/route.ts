@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchAuthSession } from "aws-amplify/auth";
 
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 
 export async function GET() {
   try {

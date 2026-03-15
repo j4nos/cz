@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   BlogPostForm,
-  type BlogPostFormInput,
 } from "@/components/platform-admin/BlogPostForm";
 import { BlogPostsTable } from "@/components/platform-admin/BlogPostsTable";
 import type { Schema } from "@/amplify/data/resource";
@@ -12,8 +11,12 @@ import { generateClient } from "aws-amplify/data";
 import { uploadData } from "aws-amplify/storage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
-import type { BlogPost } from "@/src/domain/content";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import {
+  BlogPostAdminService,
+  type BlogPostEditorInput,
+} from "@/src/application/use-cases/blogPostAdminService";
+import type { BlogPost } from "@/src/domain/entities/content";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { createBlogAdminController } from "@/src/infrastructure/controllers/createBlogAdminController";
 import { blogCoverPrefix, toSafeFileName } from "@/src/infrastructure/storage/publicUrls";
 
@@ -21,6 +24,28 @@ export default function PlatformAdminBlogPostsPage() {
   const { loading, isAuthenticated, profile } = useAuth();
   const { setToast } = useToast();
   const controller = useMemo(() => createBlogAdminController(), []);
+  const blogPostAdminService = useMemo(
+    () =>
+      new BlogPostAdminService(controller, async ({ postId, file }) => {
+        ensureAmplifyConfigured();
+        const client = generateClient<Schema>();
+        const fileName = `${Date.now()}-${toSafeFileName(file.name)}`;
+        const path = `${blogCoverPrefix(postId)}${fileName}`;
+        await uploadData({
+          path,
+          data: file,
+          options: {
+            contentType: file.type || undefined,
+          },
+        }).result;
+        await client.models.BlogPost.update({
+          id: postId,
+          coverImage: path,
+        });
+        return path;
+      }),
+    [controller],
+  );
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -29,9 +54,9 @@ export default function PlatformAdminBlogPostsPage() {
   const isPlatformAdmin = profile?.role === "platform-admin";
 
   const loadPosts = useCallback(async () => {
-    const next = await controller.listBlogPosts();
+    const next = await blogPostAdminService.loadPosts();
     setPosts(next);
-  }, [controller]);
+  }, [blogPostAdminService]);
 
   useEffect(() => {
     if (!loading && isAuthenticated && isPlatformAdmin) {
@@ -44,42 +69,13 @@ export default function PlatformAdminBlogPostsPage() {
     [posts, editingPostId]
   );
 
-  async function handleSubmit(values: BlogPostFormInput, coverFile: File | null) {
+  async function handleSubmit(values: BlogPostEditorInput, coverFile: File | null) {
     setSaving(true);
     try {
-      const nextPost: BlogPost = {
-        id:
-          values.id ??
-          (typeof crypto !== "undefined"
-            ? crypto.randomUUID()
-            : `blog-${Date.now()}`),
-        title: values.title,
-        excerpt: values.excerpt,
-        coverImage: values.coverImage,
-        contentHtml: values.contentHtml,
-        publishedAt: values.publishedAt,
-        status: values.status,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await controller.saveBlogPost(nextPost);
-      if (coverFile && nextPost.id) {
-        ensureAmplifyConfigured();
-        const client = generateClient<Schema>();
-        const fileName = `${Date.now()}-${toSafeFileName(coverFile.name)}`;
-        const path = `${blogCoverPrefix(nextPost.id)}${fileName}`;
-        await uploadData({
-          path,
-          data: coverFile,
-          options: {
-            contentType: coverFile.type || undefined,
-          },
-        }).result;
-        await client.models.BlogPost.update({
-          id: nextPost.id,
-          coverImage: path,
-        });
-      }
+      const nextPost = await blogPostAdminService.save({
+        values,
+        coverFile,
+      });
       await loadPosts();
       setEditingPostId(nextPost.id);
       setToast("Blog post saved", "success", 2000);
@@ -94,7 +90,7 @@ export default function PlatformAdminBlogPostsPage() {
   async function handleDelete(postId: string) {
     setDeletingId(postId);
     try {
-      await controller.deleteBlogPost(postId);
+      await blogPostAdminService.delete(postId);
       if (editingPostId === postId) {
         setEditingPostId(null);
       }

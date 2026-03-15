@@ -3,7 +3,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
 import { Hero } from "@/components/sections/Hero";
 import { PhotoCta } from "@/components/sections/PhotoCta";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { toPublicStorageUrl } from "@/src/infrastructure/storage/publicUrls";
 
 type CtaContent = {

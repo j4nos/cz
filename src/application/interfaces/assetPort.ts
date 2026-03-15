@@ -1,6 +1,6 @@
 import type { Asset } from "@/src/domain/entities";
 
-export interface AssetController {
+export interface AssetPort {
   createAssetWithMedia: (input: {
     tenantUserId: string;
     tenantEmail?: string;

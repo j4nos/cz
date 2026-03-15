@@ -16,23 +16,11 @@ import {
 } from "@/components/ui/Form";
 import { PlainCta } from "@/components/sections/PlainCta";
 import { Table } from "@/components/ui/Table";
+import { getListingOpenRequirementError } from "@/src/application/use-cases/listingOpenRequirements";
 import type { Asset, Listing, Product } from "@/src/domain/entities";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 import { createListingController } from "@/src/infrastructure/controllers/createListingController";
 import styles from "./CreateEditListing.module.css";
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function isWithinWindow(startsAt?: string, endsAt?: string) {
-  if (!startsAt || !endsAt) {
-    return false;
-  }
-
-  const current = today();
-  return startsAt <= current && current <= endsAt;
-}
 
 export function CreateEditListing({
   assetId,
@@ -52,25 +40,11 @@ export function CreateEditListing({
 
   useEffect(() => {
     async function load() {
-      console.log("[ASSET_LISTING_DEBUG] CreateEditListing.load:start", {
-        assetId,
-        listingId: listingId ?? null,
-        generatedListingId,
-        productsVersion,
-      });
       const controller = createReadController();
       const [nextAsset, current] = await Promise.all([
         controller.getAssetById(assetId),
         listingId ? controller.getListingById(listingId) : Promise.resolve(null),
       ]);
-
-      console.log("[ASSET_LISTING_DEBUG] CreateEditListing.load:result", {
-        assetId,
-        listingId: listingId ?? null,
-        assetFound: Boolean(nextAsset),
-        currentListingFound: Boolean(current),
-        currentListingAssetId: current?.assetId ?? null,
-      });
 
       setAsset(nextAsset);
       setCurrentListingId(current?.id ?? "");
@@ -109,10 +83,6 @@ export function CreateEditListing({
 
       const controller = createReadController();
       const nextProducts = await controller.listProductsByListingId(currentListingId);
-      console.log("[ASSET_LISTING_DEBUG] CreateEditListing.loadProducts:result", {
-        listingId: currentListingId,
-        productCount: nextProducts.length,
-      });
       setProducts(nextProducts);
     }
 
@@ -124,19 +94,11 @@ export function CreateEditListing({
       return "";
     }
 
-    if (!isWithinWindow(form.startsAt, form.endsAt)) {
-      return "Add a start and end date, and make sure today is between them.";
-    }
-
-    if (!asset || asset.imageUrls.length === 0) {
-      return "Add at least one photo.";
-    }
-
-    if (products.length === 0) {
-      return "Add at least one product.";
-    }
-
-    return "";
+    return getListingOpenRequirementError({
+      listing: form,
+      asset,
+      products,
+    }) ?? "";
   }, [asset, form, products]);
 
   if (!form) {
@@ -176,26 +138,22 @@ export function CreateEditListing({
       return;
     }
 
-    console.log("[ASSET_LISTING_DEBUG] CreateEditListing.handleSave:start", {
-      assetId,
-      listingId: listingId ?? null,
-      formId: form.id,
-      formAssetId: form.assetId,
-      title: form.title,
-      saleStatus: form.saleStatus,
-      startsAt: form.startsAt,
-      endsAt: form.endsAt,
-    });
+    if (form.saleStatus === "open") {
+      const error = getListingOpenRequirementError({
+        listing: { ...form, saleStatus: "closed" },
+        asset,
+        products,
+      });
+      if (error) {
+        setStatusMessage(error);
+        return;
+      }
+    }
 
     const controller = createListingController();
 
     if (listingId) {
       const saved = await controller.saveListingDraft(form);
-      console.log("[ASSET_LISTING_DEBUG] CreateEditListing.handleSave:update:result", {
-        requestedListingId: form.id,
-        savedListingId: saved.id,
-        savedAssetId: saved.assetId,
-      });
       setCurrentListingId(saved.id);
     } else {
       const created = await controller.createListingDraft({
@@ -207,11 +165,6 @@ export function CreateEditListing({
         description: form.description,
         startsAt: form.startsAt,
         endsAt: form.endsAt,
-      });
-      console.log("[ASSET_LISTING_DEBUG] CreateEditListing.handleSave:create:result", {
-        requestedAssetId: form.assetId,
-        createdListingId: created.id,
-        createdAssetId: created.assetId,
       });
       setCurrentListingId(created.id);
       setForm(created);
@@ -252,10 +205,6 @@ export function CreateEditListing({
 
     void (async () => {
       const saved = await createListingController().saveListingDraft(form);
-      console.log("[ASSET_LISTING_DEBUG] CreateEditListing.handleCreateProduct:listingSaved", {
-        listingId: saved.id,
-        assetId: saved.assetId,
-      });
       setCurrentListingId(saved.id);
       router.push(`/asset-provider/assets/${assetId}/listings/${saved.id}/pricing`);
     })();

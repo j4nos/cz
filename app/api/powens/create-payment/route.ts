@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { generateClient } from "aws-amplify/data";
 
 import type { Schema } from "@/amplify/data/resource";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
-import { getPowensEnv } from "@/src/infrastructure/config/powensEnv";
-import { getAppUrlEnv } from "@/src/infrastructure/config/runtimeEnv";
+import { getPowensEnv } from "@/src/config/powensEnv";
+import { getAppUrlEnv } from "@/src/config/runtimeEnv";
 
 export const runtime = "nodejs";
 

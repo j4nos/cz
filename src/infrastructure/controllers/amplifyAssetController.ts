@@ -1,7 +1,7 @@
 "use client";
 
-import type { AssetController } from "@/src/application/assetController";
-import { InvestmentPlatformService } from "@/src/application/useCases";
+import type { AssetPort } from "@/src/application/interfaces/assetPort";
+import { InvestmentPlatformService } from "@/src/application/use-cases/investmentPlatformService";
 import type { Asset } from "@/src/domain/entities";
 import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
@@ -17,7 +17,7 @@ class AmplifyClock {
   }
 }
 
-export class AmplifyAssetController implements AssetController {
+export class AmplifyAssetController implements AssetPort {
   private readonly repository = new AmplifyInvestmentRepository();
   private readonly service = new InvestmentPlatformService(this.repository, new AmplifyIdGenerator(), new AmplifyClock());
 

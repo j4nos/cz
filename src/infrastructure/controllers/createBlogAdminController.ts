@@ -1,11 +1,11 @@
 "use client";
 
-import type { BlogAdminController } from "@/src/application/blogAdminController";
+import type { BlogAdminPort } from "@/src/application/interfaces/blogAdminPort";
 import { AmplifyBlogAdminController } from "@/src/infrastructure/controllers/amplifyBlogAdminController";
 
-let controller: BlogAdminController | null = null;
+let controller: BlogAdminPort | null = null;
 
-export function createBlogAdminController(): BlogAdminController {
+export function createBlogAdminController(): BlogAdminPort {
   if (controller) {
     return controller;
   }

@@ -1,6 +1,6 @@
-import type { ProductPricingState } from "@/src/application/pricingState";
+import type { ProductPricingState } from "@/src/application/dto/pricingState";
 
-export interface PricingController {
+export interface PricingPort {
   loadPricingState: (
     listingId: string,
     productId?: string

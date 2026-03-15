@@ -1,4 +1,4 @@
-import type { ChatGateway } from "@/src/application/chatPorts";
+import type { ChatGateway } from "@/src/application/interfaces/chatPorts";
 
 export class RuleBasedChatGateway implements ChatGateway {
   async reply(input: { message: string }): Promise<string> {

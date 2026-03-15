@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-import type { AuthUser } from "@/src/auth/client";
+import type { AuthUser } from "@/src/application/interfaces/authClient";
 import type { UserProfile } from "@/src/domain/entities";
 import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
 
@@ -47,22 +47,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function loadProfile(nextUser: AuthUser | null) {
     if (!nextUser) {
-      console.log("[AUTH_DEBUG] loadProfile skip - no user");
       setProfile(null);
       return;
     }
 
     const nextProfile = await authClient.getUserProfile(nextUser.uid);
-    console.log("[AUTH_DEBUG] loadProfile result", nextUser.uid, nextProfile);
     setProfile(nextProfile);
   }
 
   async function refreshSessionState(nextUser: AuthUser | null) {
-    console.log("[AUTH_DEBUG] refreshSessionState start", nextUser);
     setUser(nextUser);
     await loadProfile(nextUser);
     setAccessToken(await authClient.getAccessToken());
-    console.log("[AUTH_DEBUG] refreshSessionState done", nextUser);
   }
 
   useEffect(() => {
@@ -76,10 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setLoading(true);
         try {
-          console.log("[AUTH_DEBUG] onAuthStateChanged callback", nextUser);
           await refreshSessionState(nextUser);
         } catch (nextError) {
-          console.log("[AUTH_DEBUG] onAuthStateChanged error", nextError);
           setUser(null);
           setProfile(null);
           setAccessToken(null);
@@ -113,17 +107,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(null);
         setLoading(true);
         try {
-          console.log("[AUTH_DEBUG] context login start", { email });
           const nextUser = await authClient.signInWithEmailAndPassword(email, password);
           const nextProfile = await authClient.getUserProfile(nextUser.uid);
-          console.log("[AUTH_DEBUG] context login user/profile", nextUser, nextProfile);
 
           setUser(nextUser);
           setProfile(nextProfile);
           setAccessToken(await authClient.getAccessToken());
           return nextProfile;
         } catch (nextError) {
-          console.log("[AUTH_DEBUG] context login error", nextError);
           setError(nextError instanceof Error ? nextError.message : "Login failed.");
           throw nextError;
         } finally {

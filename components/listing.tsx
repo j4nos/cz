@@ -7,7 +7,7 @@ import { Carousel } from "@/components/ui/Carousel";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
-import type { PublicListingWithAsset } from "@/src/application/publicContent";
+import type { PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
 import type { Listing as ListingType, Product } from "@/src/domain/entities";
 
 type Props = {
@@ -183,5 +183,3 @@ export function Listing({
     </div>
   );
 }
-
-export const ListingDetails = Listing;

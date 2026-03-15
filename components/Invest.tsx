@@ -15,6 +15,13 @@ import { KeyValueList } from "@/components/ui/KeyValueList";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLoading } from "@/contexts/LoadingContext";
 import { useToast } from "@/contexts/ToastContext";
+import {
+  getCheckoutPaymentOptions,
+  getDefaultCheckoutPaymentType,
+  isBankTransferAvailable,
+  type CheckoutPaymentType,
+} from "@/src/application/use-cases/checkoutRules";
+import { CheckoutService } from "@/src/application/use-cases/checkoutService";
 import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
 import { createOrderController } from "@/src/infrastructure/controllers/createOrderController";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
@@ -45,6 +52,30 @@ export function Invest({
   const { setLoading } = useLoading();
   const readController = useMemo(() => createReadController(), []);
   const authClient = useMemo(() => createAuthClient(), []);
+  const checkoutService = useMemo(
+    () =>
+      new CheckoutService(
+        readController,
+        createOrderController(),
+        authClient,
+        async ({ orderId, accessToken: currentAccessToken }) => {
+          const response = await fetch("/api/powens/create-payment", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${currentAccessToken}`,
+            },
+            body: JSON.stringify({ orderId }),
+          });
+          const payload = (await response.json()) as {
+            redirectUrl?: string;
+            error?: string;
+          };
+          return payload;
+        },
+      ),
+    [authClient, readController],
+  );
 
   const [listing, setListing] = useState<Listing | null>(null);
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -55,7 +86,7 @@ export function Invest({
     productIdParam || productId || ""
   );
   const [quantity, setQuantity] = useState(String(initialQuantity ?? 1));
-  const [paymentType, setPaymentType] = useState("card");
+  const [paymentType, setPaymentType] = useState<CheckoutPaymentType>("card");
   const [coupon, setCoupon] = useState(initialCoupon ?? "");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -91,27 +122,21 @@ export function Invest({
       setLoading("invest-listing", true);
       setLoadError(null);
       try {
-        const nextListing = await readController.getListingById(listingId);
-        const nextAsset = nextListing?.assetId
-          ? await readController.getAssetById(nextListing.assetId)
-          : null;
-        const listingProducts = await readController.listProductsByListingId(
-          listingId
-        );
-        const defaultProductId =
-          productIdParam || productId || listingProducts[0]?.id || "";
-        const defaultProduct =
-          listingProducts.find((item) => item.id === defaultProductId) ??
-          listingProducts[0] ??
-          null;
+        const loaded = await checkoutService.loadCheckout({
+          listingId,
+          requestedProductId: productIdParam || productId || undefined,
+          initialQuantity,
+        });
 
-        setListing(nextListing);
-        setAsset(nextAsset);
-        setProducts(listingProducts);
-        setSelectedProductId((current) => current || defaultProductId);
-        if (defaultProduct) {
-          setQuantity(String(initialQuantity ?? defaultProduct.minPurchase ?? 1));
-        }
+        setListing(loaded.listing);
+        setAsset(loaded.asset);
+        setProducts(loaded.products);
+        setProviderName(loaded.providerName);
+        setSelectedProductId((current) => current || loaded.selectedProductId);
+        setQuantity(loaded.quantity);
+        setPaymentType((current) =>
+          getDefaultCheckoutPaymentType(loaded.asset, current || loaded.paymentType),
+        );
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to load listing.";
@@ -127,40 +152,9 @@ export function Invest({
     listingId,
     productId,
     productIdParam,
-    readController,
+    checkoutService,
     setLoading,
   ]);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadProvider() {
-      if (!asset?.tenantUserId) {
-        setProviderName(null);
-        return;
-      }
-
-      try {
-        const providerProfile = await authClient.getUserProfile(asset.tenantUserId);
-        const companyName = providerProfile?.companyName?.trim() || null;
-        if (!active) {
-          return;
-        }
-        setProviderName(companyName);
-      } catch {
-        if (!active) {
-          return;
-        }
-        setProviderName(null);
-      }
-    }
-
-    void loadProvider();
-
-    return () => {
-      active = false;
-    };
-  }, [asset?.tenantUserId, authClient]);
 
   const selectedProduct = useMemo(
     () => products.find((item) => item.id === selectedProductId) ?? null,
@@ -171,9 +165,8 @@ export function Invest({
   const parsedQty = Number(quantity || 0);
   const baseUnitPrice = selectedProduct?.unitPrice ?? 0;
   const total = baseUnitPrice * parsedQty;
-  const powensEnabled = Boolean(
-    asset?.beneficiaryIban?.trim() && asset?.beneficiaryLabel?.trim()
-  );
+  const powensEnabled = isBankTransferAvailable(asset);
+  const paymentOptions = getCheckoutPaymentOptions(asset);
 
   useEffect(() => {
     if (!powensEnabled && paymentType === "bank-transfer") {
@@ -183,61 +176,37 @@ export function Invest({
 
   async function handlePlaceOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!selectedProduct || !listing) {
-      setToast("Missing listing or product.", "danger", 2500);
-      return;
-    }
-
-    if (!activeUser && !authLoading) {
-      setToast("Login required to place order.", "warning", 2500);
-      router.push("/login");
-      return;
-    }
-
-    if (!activeUser) {
-      setToast("Login required to place order.", "warning", 2500);
-      return;
-    }
-
     setSubmitting(true);
 
     try {
-      const order = await createOrderController().placeOrder({
-        investorId: activeUser.uid,
-        listingId: listing.id,
-        productId: selectedProduct.id,
+      const submitResult = await checkoutService.submitCheckout({
+        listing,
+        asset,
+        product: selectedProduct,
         quantity: parsedQty,
-        paymentProvider: paymentType,
+        paymentType,
+        activeUserId: activeUser?.uid,
+        authLoading,
+        accessToken,
       });
 
-      if (paymentType === "bank-transfer") {
-        if (!accessToken) {
-          throw new Error("Missing access token for bank transfer.");
+      if (submitResult.kind === "error") {
+        setToast(submitResult.message, submitResult.tone, 2500);
+        if (submitResult.redirectToLogin) {
+          router.push("/login");
         }
-        const response = await fetch("/api/powens/create-payment", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ orderId: order.id }),
-        });
-        const payload = (await response.json()) as {
-          redirectUrl?: string;
-          error?: string;
-        };
-        if (!response.ok || !payload.redirectUrl) {
-          throw new Error(payload.error || "Failed to start bank transfer.");
-        }
-        window.location.assign(payload.redirectUrl);
+        return;
+      }
+
+      if (submitResult.kind === "redirect") {
+        window.location.assign(submitResult.url);
         return;
       }
 
       if (onSuccess) {
-        onSuccess(order.id);
+        onSuccess(submitResult.orderId);
       } else {
-        router.push(`/investor/orders/${order.id}`);
+        router.push(`/investor/orders/${submitResult.orderId}`);
       }
     } catch (error) {
       const message =
@@ -329,18 +298,10 @@ export function Invest({
               <FormSelect
                 id="checkout-payment"
                 value={paymentType}
-                onChange={(event) => setPaymentType(event.target.value)}
-                options={[
-                  { value: "card", label: "Card" },
-                  ...(powensEnabled
-                    ? [
-                        {
-                          value: "bank-transfer",
-                          label: "Bank transfer (Powens)",
-                        },
-                      ]
-                    : []),
-                ]}
+                onChange={(event) =>
+                  setPaymentType(event.target.value as CheckoutPaymentType)
+                }
+                options={paymentOptions}
               />
             </FormField>
             <FormField label="Coupon (optional)" htmlFor="checkout-coupon">

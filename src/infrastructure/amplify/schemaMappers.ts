@@ -1,7 +1,24 @@
 import type { Schema } from "@/amplify/data/resource";
-import type { AssetDocument, BlogPost } from "@/src/domain/content";
+import type { AssetDocument, BlogPost } from "@/src/domain/entities/content";
 import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
 import { toPublicStorageUrl, toPublicStorageUrls } from "@/src/infrastructure/storage/publicUrls";
+
+function normalizeAssetStatus(value?: string): Asset["status"] {
+  switch ((value ?? "").toLowerCase()) {
+    case "draft":
+      return "draft";
+    case "submitted":
+      return "submitted";
+    case "approved":
+      return "approved";
+    case "pending":
+      return "pending";
+    case "closed":
+      return "closed";
+    default:
+      return "draft";
+  }
+}
 
 function normalizeOrderStatus(value?: string): Order["status"] {
   switch ((value ?? "").toLowerCase()) {
@@ -52,7 +69,7 @@ export function mapAssetRecord(item: Schema["Asset"]["type"]): AssetRecord {
     country: item.country ?? "",
     assetClass: item.assetClass ?? "",
     tokenStandard: item.tokenStandard ?? undefined,
-    status: item.status ? item.status.toLowerCase() : "draft",
+    status: normalizeAssetStatus(item.status ?? undefined),
     missingDocsCount: Number(item.missingDocsCount ?? 0),
     tokenAddress: item.tokenAddress ?? undefined,
     latestRunId: item.latestRunId ?? undefined,

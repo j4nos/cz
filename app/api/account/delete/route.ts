@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import outputs from "@/amplify_outputs.json";
 import type { Schema } from "@/amplify/data/resource";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
 
 const REGION = outputs.auth?.aws_region || "eu-central-1";

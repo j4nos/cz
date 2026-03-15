@@ -9,9 +9,20 @@ type PopupProps = {
   onClose: () => void;
   children: ReactNode;
   title?: string;
+  width?: string | number;
+  height?: string | number;
+  showCloseButton?: boolean;
 };
 
-export function Popup({ open, onClose, children, title }: PopupProps) {
+export function Popup({
+  open,
+  onClose,
+  children,
+  title,
+  width = 400,
+  height = "auto",
+  showCloseButton = true,
+}: PopupProps) {
   useEffect(() => {
     if (!open) {
       return;
@@ -36,12 +47,20 @@ export function Popup({ open, onClose, children, title }: PopupProps) {
       <div
         aria-modal="true"
         className={styles.popup}
+        style={{ width, height }}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
       >
-        <button aria-label="Close popup" className={styles.close} onClick={onClose} type="button">
-          x
-        </button>
+        {showCloseButton ? (
+          <button
+            aria-label="Close popup"
+            className={styles.close}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        ) : null}
         {title ? <h2 className={styles.title}>{title}</h2> : null}
         <div className={styles.content}>{children}</div>
       </div>

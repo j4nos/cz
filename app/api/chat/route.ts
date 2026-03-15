@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ChatService } from "@/src/application/chatService";
+import { ChatService } from "@/src/application/use-cases/chatService";
 import { RuleBasedChatGateway } from "@/src/infrastructure/gateways/ruleBasedChatGateway";
 import { AmplifyChatRepository } from "@/src/infrastructure/repositories/amplifyChatRepository";
 

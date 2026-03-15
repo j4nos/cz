@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { ChatGateway, ChatRepository } from "@/src/application/chatPorts";
-import { ChatService } from "@/src/application/chatService";
-import type { ChatMessage, ChatThreadSummary } from "@/src/domain/chat";
+import type { ChatGateway, ChatRepository } from "@/src/application/interfaces/chatPorts";
+import { ChatService } from "@/src/application/use-cases/chatService";
+import type { ChatMessage, ChatThreadSummary } from "@/src/domain/entities/chat";
 
 class FakeChatRepository implements ChatRepository {
   readonly threads = new Map<string, ChatThreadSummary>();

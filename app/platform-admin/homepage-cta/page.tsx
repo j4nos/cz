@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { useToast } from "@/contexts/ToastContext";
 import type { Schema } from "@/amplify/data/resource";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 
 export default function PlatformAdminHomepageCtaPage() {
   const client = useMemo(() => {

@@ -1,44 +1,17 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { gunzipSync } from "zlib";
-import { generateClient } from "aws-amplify/data";
 
-import type { Schema } from "@/amplify/data/resource";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
-import { listAll } from "@/src/infrastructure/amplify/pagination";
-import { getPowensWebhookSecret } from "@/src/infrastructure/config/powensEnv";
-import { getNodeEnv } from "@/src/infrastructure/config/runtimeEnv";
+import { PowensPaymentSyncService } from "@/src/application/use-cases/powensPaymentSyncService";
+import { getPowensWebhookSecret } from "@/src/config/powensEnv";
+import { getNodeEnv } from "@/src/config/runtimeEnv";
+import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
 export const runtime = "nodejs";
-
-const getClient = () => {
-  ensureAmplifyConfigured();
-  return generateClient<Schema>();
-};
 
 type PowensPaymentWebhook = {
   id?: number | string;
   state?: string;
-};
-
-const normalizeState = (state?: string) => (state || "").toLowerCase();
-
-const mapPaymentStateToOrderStatus = (state?: string) => {
-  switch (normalizeState(state)) {
-    case "done":
-      return "paid";
-    case "rejected":
-    case "cancelled":
-    case "canceled":
-      return "failed";
-    case "created":
-    case "pending":
-    case "accepted":
-    case "validating":
-      return "pending";
-    default:
-      return undefined;
-  }
 };
 
 const readRawBody = async (request: Request) => {
@@ -118,24 +91,14 @@ export async function POST(request: Request) {
     }
 
     const paymentId = String(payload.id);
-    const client = getClient();
-    const matches = await listAll<Schema["Order"]["type"], { nextToken?: string }>((args) =>
-      client.models.Order.list({
-        filter: { paymentProviderId: { eq: paymentId } },
-        ...(args ?? {}),
-      }),
-    );
-    const order = matches[0];
+    const service = new PowensPaymentSyncService(new AmplifyInvestmentRepository());
+    const order = await service.syncByPaymentProviderId({
+      paymentProviderId: paymentId,
+      paymentState: payload.state,
+    });
     if (!order) {
       return NextResponse.json({ received: true }, { status: 202 });
     }
-
-    const nextStatus = mapPaymentStateToOrderStatus(payload.state);
-    await client.models.Order.update({
-      id: order.id,
-      status: nextStatus ?? order.status ?? "pending",
-      paymentProviderStatus: payload.state ?? order.paymentProviderStatus ?? "",
-    });
 
     return NextResponse.json({ received: true });
   } catch (error) {

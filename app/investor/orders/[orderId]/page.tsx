@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { getInvestorOrderEntry } from "@/src/application/publicContent";
+import { getInvestorOrderEntry } from "@/src/application/use-cases/publicContent";
 import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
 import { InvestorOrder } from "./InvestorOrder";
 

@@ -1,16 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
+import { AccountSettingsService } from "@/src/application/use-cases/accountSettingsService";
+import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
 
 export default function InvestorSettingsPage() {
   const { user, profile, logout, accessToken } = useAuth();
   const router = useRouter();
   const { setToast } = useToast();
+  const accountSettingsService = useMemo(
+    () =>
+      new AccountSettingsService(
+        createAuthClient(),
+        async (currentAccessToken) => {
+          const response = await fetch("/api/account/delete", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${currentAccessToken}`,
+            },
+          });
+          if (!response.ok) {
+            throw new Error("Delete failed.");
+          }
+        },
+      ),
+    [],
+  );
   const [country, setCountry] = useState(profile?.country ?? "");
   const [investorType, setInvestorType] = useState(
     profile?.investorType ?? "retail"
@@ -29,27 +50,18 @@ export default function InvestorSettingsPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user || !profile) {
-      return;
-    }
-    const email = user.email;
-    const role = profile.role;
-    if (!email || !role) {
-      return;
-    }
-
-    await (await import("@/src/infrastructure/auth/createAuthClient"))
-      .createAuthClient()
-      .upsertUserProfile({
-        uid: user.uid,
-        email,
-        role,
+    try {
+      const result = await accountSettingsService.saveInvestorSettings({
+        user,
+        profile,
         country,
         investorType,
         companyName,
-        kycStatus: profile.kycStatus,
       });
-    setToast("Setting saved", "success", 2000);
+      setToast(result.message, result.kind === "success" ? "success" : "danger", 2000);
+    } catch {
+      setToast("Failed to save settings.", "danger", 2000);
+    }
   }
 
   async function handleDeleteAccount() {
@@ -59,23 +71,15 @@ export default function InvestorSettingsPage() {
     );
     if (!confirmed) return;
     try {
-      if (!accessToken) {
-        throw new Error("Missing access token.");
-      }
-      const response = await fetch("/api/account/delete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Delete failed.");
+      const result = await accountSettingsService.deleteAccount(accessToken);
+      if (result.kind === "error") {
+        setToast(result.message, "danger", 2500);
+        return;
       }
       await logout();
       router.push("/");
-      setToast("Account deleted.", "success", 2500);
-    } catch (error) {
+      setToast(result.message, "success", 2500);
+    } catch {
       setToast("Failed to delete account.", "danger", 2500);
     }
   }

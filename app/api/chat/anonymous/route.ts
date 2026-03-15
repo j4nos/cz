@@ -7,8 +7,8 @@ import {
   getAnonCookieMaxAge,
   getAnonCookieName,
 } from "@/src/infrastructure/auth/anonSession";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
-import { getNodeEnv } from "@/src/infrastructure/config/runtimeEnv";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
+import { getNodeEnv } from "@/src/config/runtimeEnv";
 
 export const runtime = "nodejs";
 

@@ -10,17 +10,16 @@ import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
 import { useToast } from "@/contexts/ToastContext";
 import { uploadData } from "aws-amplify/storage";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import {
   assetImagePrefix,
   normalizeStoredPublicPath,
-  toPublicStorageUrl,
   toSafeFileName,
 } from "@/src/infrastructure/storage/publicUrls";
 
 export default function AssetWizardStep2Page() {
   const router = useRouter();
-  const { state, updateState } = useAssetWizard();
+  const { state } = useAssetWizard();
   const { setToast } = useToast();
   const [files, setFiles] = useState<File[]>([]);
 
@@ -65,9 +64,6 @@ export default function AssetWizardStep2Page() {
       imageUrls: nextImages,
     });
 
-    updateState({
-      photos: [...state.photos, ...uploadedPaths.map(toPublicStorageUrl)],
-    });
     setFiles([]);
     setToast(`Uploaded ${uploadedPaths.length} file(s).`, "success", 2000);
   }
@@ -98,11 +94,6 @@ export default function AssetWizardStep2Page() {
           </Button>
         </div>
       </Form>
-      <ul>
-        {state.photos.map((photo) => (
-          <li key={photo}>{photo}</li>
-        ))}
-      </ul>
     </>
   );
 }

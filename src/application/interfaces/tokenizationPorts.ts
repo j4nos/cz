@@ -1,5 +1,5 @@
 import type { Asset } from "@/src/domain/entities";
-import type { TokenizationResult } from "@/src/domain/tokenization";
+import type { TokenizationResult } from "@/src/domain/entities/tokenization";
 
 export interface AssetTokenizationRepository {
   getAssetById(id: string): Promise<Asset | null>;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Card } from "@/components/ui/Card";
 import { AppLink } from "@/components/ui/AppLink";
-import { listPublicListings, type PublicListingWithAsset } from "@/src/application/publicContent";
+import { listPublicListings, type PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
 import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
 
 export function Listings({

@@ -1,4 +1,4 @@
-import type { BlogPost } from "@/src/domain/content";
+import type { BlogPost } from "@/src/domain/entities/content";
 import type { Asset, Listing, Order, Product } from "@/src/domain/entities";
 
 export type PublicListingWithAsset = {
@@ -21,14 +21,6 @@ export async function listPublicListings(reader: PublicContentReader): Promise<P
   return reader.listOpenListingsWithAssets();
 }
 
-export async function listFeaturedPublicListings(
-  reader: PublicContentReader,
-  limit = 2,
-): Promise<PublicListingWithAsset[]> {
-  const listings = await reader.listOpenListingsWithAssets();
-  return listings.slice(0, limit);
-}
-
 export async function getPublicListingDetails(
   reader: PublicContentReader,
   listingId: string,
@@ -48,41 +40,6 @@ export async function listPublicBlogPosts(reader: PublicContentReader): Promise<
 
 export async function getPublicBlogPost(reader: PublicContentReader, blogId: string): Promise<BlogPost | null> {
   return reader.getPublishedBlogPostById(blogId);
-}
-
-export async function getPublicInvestmentEntry(
-  reader: PublicContentReader,
-  listingId: string,
-  productId: string,
-): Promise<{ listingWithAsset: PublicListingWithAsset | null; product: Product | null }> {
-  const [listingWithAsset, products] = await Promise.all([
-    reader.getOpenListingWithAssetById(listingId),
-    reader.listProductsByListingId(listingId),
-  ]);
-
-  if (!listingWithAsset) {
-    return { listingWithAsset: null, product: null };
-  }
-
-  const product = products.find((item) => item.id === productId) ?? null;
-  return { listingWithAsset, product };
-}
-
-export async function getCheckoutEntry(
-  reader: PublicContentReader,
-  listingId: string,
-  productId: string,
-): Promise<{ listingWithAsset: PublicListingWithAsset | null; product: Product | null }> {
-  const [listingWithAsset, product] = await Promise.all([
-    reader.getListingWithAssetById(listingId),
-    reader.getProductById(productId),
-  ]);
-
-  if (!listingWithAsset || !product || product.listingId !== listingId) {
-    return { listingWithAsset: null, product: null };
-  }
-
-  return { listingWithAsset, product };
 }
 
 export async function getInvestorOrderEntry(

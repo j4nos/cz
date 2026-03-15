@@ -1,11 +1,11 @@
 "use client";
 
-import type { OrderController } from "@/src/application/orderController";
+import type { OrderPort } from "@/src/application/interfaces/orderPort";
 import { AmplifyOrderController } from "@/src/infrastructure/controllers/amplifyOrderController";
 
-let controller: OrderController | null = null;
+let controller: OrderPort | null = null;
 
-export function createOrderController(): OrderController {
+export function createOrderController(): OrderPort {
   if (controller) {
     return controller;
   }

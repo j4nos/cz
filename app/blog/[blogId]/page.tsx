@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { BlogDetails } from "@/components/blog/BlogDetails";
-import { getPublicBlogPost } from "@/src/application/publicContent";
+import { getPublicBlogPost } from "@/src/application/use-cases/publicContent";
 import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
 
 export const revalidate = 60;

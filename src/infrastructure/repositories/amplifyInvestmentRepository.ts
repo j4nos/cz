@@ -1,11 +1,11 @@
 import { generateClient } from "aws-amplify/data";
 
 import type { Schema } from "@/amplify/data/resource";
-import type { InvestmentRepository } from "@/src/application/ports";
-import type { AssetTokenizationRepository } from "@/src/application/tokenizationPorts";
-import type { BlogPost } from "@/src/domain/content";
+import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
+import type { AssetTokenizationRepository } from "@/src/application/interfaces/tokenizationPorts";
+import type { BlogPost } from "@/src/domain/entities/content";
 import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { listAll } from "@/src/infrastructure/amplify/pagination";
 import { normalizeStoredPublicPath } from "@/src/infrastructure/storage/publicUrls";
 import {
@@ -66,11 +66,6 @@ export class AmplifyInvestmentRepository
   }
 
   async createAsset(input: Asset): Promise<Asset> {
-    console.log("[ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.createAsset:start", {
-      assetId: input.id,
-      tenantUserId: input.tenantUserId,
-      name: input.name,
-    });
     const response = await this.client.models.Asset.create({
       id: input.id,
       tenantUserId: input.tenantUserId,
@@ -87,22 +82,12 @@ export class AmplifyInvestmentRepository
       imageUrls: input.imageUrls.map(normalizeStoredPublicPath),
     });
 
-    const mapped = response.data ? mapAssetRecord(response.data) : input;
-    console.log("[ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.createAsset:result", {
-      assetId: mapped.id,
-      tenantUserId: mapped.tenantUserId,
-    });
-    return mapped;
+    return response.data ? mapAssetRecord(response.data) : input;
   }
 
   async getAssetById(id: string): Promise<Asset | null> {
     const response = await this.client.models.Asset.get({ id });
-    const mapped = response.data ? mapAssetRecord(response.data) : null;
-    console.log("[ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getAssetById", {
-      assetId: id,
-      found: Boolean(mapped),
-    });
-    return mapped;
+    return response.data ? mapAssetRecord(response.data) : null;
   }
 
   async updateAsset(asset: Asset): Promise<Asset> {
@@ -147,12 +132,6 @@ export class AmplifyInvestmentRepository
   }
 
   async createListing(input: Listing): Promise<Listing> {
-    console.log("[ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.createListing:start", {
-      listingId: input.id,
-      assetId: input.assetId,
-      title: input.title,
-      saleStatus: input.saleStatus,
-    });
     const response = await this.client.models.Listing.create({
       id: input.id,
       assetId: input.assetId,
@@ -167,33 +146,15 @@ export class AmplifyInvestmentRepository
       saleEndDate: input.endsAt,
     });
 
-    const mapped = response.data ? mapListingRecord(response.data) : input;
-    console.log("[ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.createListing:result", {
-      listingId: mapped.id,
-      assetId: mapped.assetId,
-      saleStatus: mapped.saleStatus,
-    });
-    return mapped;
+    return response.data ? mapListingRecord(response.data) : input;
   }
 
   async getListingById(id: string): Promise<Listing | null> {
     const response = await this.client.models.Listing.get({ id });
-    const mapped = response.data ? mapListingRecord(response.data) : null;
-    console.log("[ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.getListingById", {
-      listingId: id,
-      found: Boolean(mapped),
-      assetId: mapped?.assetId ?? null,
-    });
-    return mapped;
+    return response.data ? mapListingRecord(response.data) : null;
   }
 
   async updateListing(listing: Listing): Promise<Listing> {
-    console.log("[ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.updateListing:start", {
-      listingId: listing.id,
-      assetId: listing.assetId,
-      title: listing.title,
-      saleStatus: listing.saleStatus,
-    });
     const response = await this.client.models.Listing.update({
       id: listing.id,
       assetId: listing.assetId,
@@ -208,13 +169,7 @@ export class AmplifyInvestmentRepository
       saleEndDate: listing.endsAt,
     });
 
-    const mapped = response.data ? mapListingRecord(response.data) : listing;
-    console.log("[ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.updateListing:result", {
-      listingId: mapped.id,
-      assetId: mapped.assetId,
-      saleStatus: mapped.saleStatus,
-    });
-    return mapped;
+    return response.data ? mapListingRecord(response.data) : listing;
   }
 
   async deleteListing(listingId: string): Promise<void> {
@@ -222,13 +177,6 @@ export class AmplifyInvestmentRepository
   }
 
   async createProduct(input: Product): Promise<Product> {
-    console.log("[PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.createProduct:start", {
-      productId: input.id,
-      listingId: input.listingId,
-      name: input.name,
-      currency: input.currency,
-      unitPrice: input.unitPrice,
-    });
     const response = await this.client.models.Product.create({
       id: input.id,
       listingId: input.listingId,
@@ -242,25 +190,12 @@ export class AmplifyInvestmentRepository
       remainingSupply: input.remainingSupply,
     });
 
-    const mapped = response.data ? mapProductRecord(response.data) : input;
-    console.log("[PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.createProduct:result", {
-      productId: mapped.id,
-      listingId: mapped.listingId,
-      name: mapped.name,
-    });
-    return mapped;
+    return response.data ? mapProductRecord(response.data) : input;
   }
 
   async getProductById(id: string): Promise<Product | null> {
     const response = await this.client.models.Product.get({ id });
-    const mapped = response.data ? mapProductRecord(response.data) : null;
-    console.log("[PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.getProductById", {
-      productId: id,
-      found: Boolean(mapped),
-      listingId: mapped?.listingId ?? null,
-      name: mapped?.name ?? null,
-    });
-    return mapped;
+    return response.data ? mapProductRecord(response.data) : null;
   }
 
   async deleteProduct(productId: string): Promise<void> {
@@ -268,13 +203,6 @@ export class AmplifyInvestmentRepository
   }
 
   async updateProduct(product: Product): Promise<Product> {
-    console.log("[PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.updateProduct:start", {
-      productId: product.id,
-      listingId: product.listingId,
-      name: product.name,
-      unitPrice: product.unitPrice,
-      supplyTotal: product.supplyTotal,
-    });
     const response = await this.client.models.Product.update({
       id: product.id,
       name: product.name,
@@ -287,14 +215,7 @@ export class AmplifyInvestmentRepository
       remainingSupply: product.remainingSupply,
     });
 
-    const mapped = response.data ? mapProductRecord(response.data) : product;
-    console.log("[PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.updateProduct:result", {
-      productId: mapped.id,
-      listingId: mapped.listingId,
-      name: mapped.name,
-      unitPrice: mapped.unitPrice,
-    });
-    return mapped;
+    return response.data ? mapProductRecord(response.data) : product;
   }
 
   async createOrder(input: Order): Promise<Order> {
@@ -323,6 +244,18 @@ export class AmplifyInvestmentRepository
     return response.data ? mapOrderRecord(response.data) : null;
   }
 
+  async findOrderByPaymentProviderId(paymentProviderId: string): Promise<Order | null> {
+    const records = await listAll<Schema["Order"]["type"], { nextToken?: string }>((args) =>
+      this.client.models.Order.list({
+        filter: { paymentProviderId: { eq: paymentProviderId } },
+        ...(args ?? {}),
+      })
+    );
+
+    const [first] = records;
+    return first ? mapOrderRecord(first) : null;
+  }
+
   async updateOrder(order: Order): Promise<Order> {
     const response = await this.client.models.Order.update({
       id: order.id,
@@ -347,13 +280,7 @@ export class AmplifyInvestmentRepository
     const records = await listAll<Schema["Listing"]["type"], { nextToken?: string }>((args) =>
       this.client.models.Listing.list(args)
     );
-    const mapped = records.map(mapListingRecord);
-    console.log("[ASSET_LISTING_DEBUG] AmplifyInvestmentRepository.listListings", {
-      count: mapped.length,
-      listingIds: mapped.map((listing) => listing.id),
-      assetIds: mapped.map((listing) => listing.assetId),
-    });
-    return mapped;
+    return records.map(mapListingRecord);
   }
 
   async listProductsByListingId(listingId: string): Promise<Product[]> {
@@ -363,14 +290,7 @@ export class AmplifyInvestmentRepository
         ...(args ?? {}),
       })
     );
-    const mapped = records.map(mapProductRecord);
-    console.log("[PRODUCT_PRICING_DEBUG] AmplifyInvestmentRepository.listProductsByListingId", {
-      listingId,
-      count: mapped.length,
-      productIds: mapped.map((product) => product.id),
-      names: mapped.map((product) => product.name),
-    });
-    return mapped;
+    return records.map(mapProductRecord);
   }
 
   async listOrdersByInvestor(investorId: string): Promise<Order[]> {

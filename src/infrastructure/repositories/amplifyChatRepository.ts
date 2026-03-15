@@ -1,9 +1,9 @@
 import { generateClient } from "aws-amplify/data";
 
 import type { Schema } from "@/amplify/data/resource";
-import type { ChatRepository } from "@/src/application/chatPorts";
-import type { ChatMessage, ChatThreadSummary } from "@/src/domain/chat";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import type { ChatRepository } from "@/src/application/interfaces/chatPorts";
+import type { ChatMessage, ChatThreadSummary } from "@/src/domain/entities/chat";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { listAll } from "@/src/infrastructure/amplify/pagination";
 
 export class AmplifyChatRepository implements ChatRepository {

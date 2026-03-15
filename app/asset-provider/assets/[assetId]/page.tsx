@@ -15,14 +15,16 @@ import { PlainCta } from "@/components/sections/PlainCta";
 import { Table } from "@/components/ui/Table";
 import { useLoading } from "@/contexts/LoadingContext";
 import { useToast } from "@/contexts/ToastContext";
+import {
+  buildUpdatedAssetBasics,
+  mergeAssetImagePaths,
+} from "@/src/application/use-cases/assetUpdateAssembler";
 import type { Asset, Listing } from "@/src/domain/entities";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { createAssetController } from "@/src/infrastructure/controllers/createAssetController";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 import {
   assetImagePrefix,
-  normalizeStoredPublicPath,
-  toPublicStorageUrls,
   toSafeFileName,
 } from "@/src/infrastructure/storage/publicUrls";
 
@@ -50,21 +52,11 @@ export default function AssetProviderAssetPage() {
     async function load() {
       setLoading("asset-provider-asset", true);
       try {
-        console.log("[ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:start", {
-          assetId: params.assetId,
-        });
         const controller = createReadController();
         const [nextAsset, nextListings] = await Promise.all([
           controller.getAssetById(params.assetId),
           controller.listListingsByAssetId(params.assetId),
         ]);
-        console.log("[ASSET_LISTING_DEBUG] AssetProviderAssetPage.load:result", {
-          assetId: params.assetId,
-          assetFound: Boolean(nextAsset),
-          listingCount: nextListings.length,
-          listingIds: nextListings.map((listing) => listing.id),
-          listingAssetIds: nextListings.map((listing) => listing.assetId),
-        });
         setAsset(nextAsset as AssetView | null);
         if (nextAsset) {
           setName(nextAsset.name ?? "");
@@ -92,10 +84,7 @@ export default function AssetProviderAssetPage() {
       setLoading("asset-provider-asset-upload-photo", true);
       ensureAmplifyConfigured();
       const client = generateClient<Schema>();
-      const existingImages = Array.isArray(asset.imageUrls)
-        ? asset.imageUrls.map(normalizeStoredPublicPath)
-        : [];
-      const startIndex = existingImages.length + 1;
+      const startIndex = asset.imageUrls.length + 1;
 
       const uploadedPaths = await Promise.all(
         photos.map(async (file, offset) => {
@@ -114,16 +103,19 @@ export default function AssetProviderAssetPage() {
         })
       );
 
-      const nextImages = Array.from(new Set([...existingImages, ...uploadedPaths]));
+      const merged = mergeAssetImagePaths({
+        asset,
+        uploadedPaths,
+      });
 
       await client.models.Asset.update({
         id: asset.id,
-        imageUrls: nextImages,
+        imageUrls: merged.storedPaths,
       });
 
       setAsset({
         ...asset,
-        imageUrls: toPublicStorageUrls(nextImages),
+        imageUrls: merged.publicUrls,
       });
       setPhotos([]);
       setToast("Photo uploaded.", "success", 2500);
@@ -159,14 +151,16 @@ export default function AssetProviderAssetPage() {
     setSavingBasics(true);
     try {
       setLoading("asset-provider-asset-save", true);
-      const updated = await createAssetController().updateAsset({
-        ...asset,
-        name,
-        country: countryValue,
-        assetClass: assetClassValue,
-        beneficiaryIban: beneficiaryIban || undefined,
-        beneficiaryLabel: beneficiaryLabel || undefined,
-      });
+      const updated = await createAssetController().updateAsset(
+        buildUpdatedAssetBasics({
+          asset,
+          name,
+          country: countryValue,
+          assetClass: assetClassValue,
+          beneficiaryIban,
+          beneficiaryLabel,
+        })
+      );
       setAsset(updated as AssetView);
       setToast("Asset basics updated.", "success");
     } catch {

@@ -20,6 +20,8 @@ export default function AssetWizardStep1Page() {
     return <p className="muted">Login to create an asset.</p>;
   }
 
+  const activeUserId = activeUser.uid;
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const assetId = state.assetId || crypto.randomUUID();
@@ -40,7 +42,7 @@ export default function AssetWizardStep1Page() {
       } else {
         await repository.createAsset({
           id: assetId,
-          tenantUserId: activeUser.uid,
+          tenantUserId: activeUserId,
           name: state.name,
           country: state.country || "France",
           assetClass: state.assetClass,

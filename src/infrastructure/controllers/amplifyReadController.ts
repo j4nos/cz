@@ -1,9 +1,9 @@
 "use client";
 
-import type { ReadController } from "@/src/application/readController";
+import type { ReadPort } from "@/src/application/interfaces/readPort";
 import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
-export class AmplifyReadController implements ReadController {
+export class AmplifyReadController implements ReadPort {
   constructor(private readonly repository: AmplifyInvestmentRepository = new AmplifyInvestmentRepository()) {}
 
   async listAssets() {
@@ -11,22 +11,11 @@ export class AmplifyReadController implements ReadController {
   }
 
   async getAssetById(assetId: string) {
-    const asset = await this.repository.getAssetById(assetId);
-    console.log("[ASSET_LISTING_DEBUG] AmplifyReadController.getAssetById", {
-      assetId,
-      found: Boolean(asset),
-    });
-    return asset;
+    return this.repository.getAssetById(assetId);
   }
 
   async getListingById(listingId: string) {
-    const listing = await this.repository.getListingById(listingId);
-    console.log("[ASSET_LISTING_DEBUG] AmplifyReadController.getListingById", {
-      listingId,
-      found: Boolean(listing),
-      assetId: listing?.assetId ?? null,
-    });
-    return listing;
+    return this.repository.getListingById(listingId);
   }
 
   async getOrderById(orderId: string) {
@@ -35,14 +24,7 @@ export class AmplifyReadController implements ReadController {
 
   async listListingsByAssetId(assetId: string) {
     const listings = await this.repository.listListings();
-    const filtered = listings.filter((listing) => listing.assetId === assetId);
-    console.log("[ASSET_LISTING_DEBUG] AmplifyReadController.listListingsByAssetId", {
-      assetId,
-      totalListings: listings.length,
-      filteredListings: filtered.length,
-      filteredIds: filtered.map((listing) => listing.id),
-    });
-    return filtered;
+    return listings.filter((listing) => listing.assetId === assetId);
   }
 
   async listProductsByListingId(listingId: string) {

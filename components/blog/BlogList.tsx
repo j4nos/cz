@@ -1,4 +1,4 @@
-import type { BlogPost } from "@/src/domain/content";
+import type { BlogPost } from "@/src/domain/entities/content";
 import { AppLink } from "@/components/ui/AppLink";
 
 import styles from "./BlogList.module.css";

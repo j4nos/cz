@@ -1,5 +1,5 @@
-import type { ChatGateway, ChatRepository } from "@/src/application/chatPorts";
-import type { ChatMessage, ChatThreadSummary } from "@/src/domain/chat";
+import type { ChatGateway, ChatRepository } from "@/src/application/interfaces/chatPorts";
+import type { ChatMessage, ChatThreadSummary } from "@/src/domain/entities/chat";
 
 export interface ChatIdGenerator {
   next(): string;

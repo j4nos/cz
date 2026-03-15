@@ -5,7 +5,7 @@ import { POST } from "@/app/api/tokenize-asset/route";
 import { generateClient } from "aws-amplify/data";
 
 vi.mock("aws-amplify/data", () => ({ generateClient: vi.fn() }));
-vi.mock("@/src/infrastructure/amplify/config", () => ({ ensureAmplifyConfigured: vi.fn() }));
+vi.mock("@/src/config/amplify", () => ({ ensureAmplifyConfigured: vi.fn() }));
 vi.mock("@/artifacts/contracts/AssetToken20.sol/AssetToken20.json", () => ({
   default: { abi: [], bytecode: "0x00" },
 }));

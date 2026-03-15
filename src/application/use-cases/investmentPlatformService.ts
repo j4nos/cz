@@ -1,6 +1,6 @@
-import type { InvestmentRepository } from "@/src/application/ports";
+import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
 import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
-import { DomainError } from "@/src/domain/errors";
+import { DomainError } from "@/src/domain/value-objects/errors";
 
 export interface IdGenerator {
   next(): string;

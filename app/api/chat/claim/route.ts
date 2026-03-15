@@ -6,10 +6,10 @@ import {
   getAnonCookieName,
   parseAnonCookieValue,
 } from "@/src/infrastructure/auth/anonSession";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { listAll } from "@/src/infrastructure/amplify/pagination";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
-import { getNodeEnv } from "@/src/infrastructure/config/runtimeEnv";
+import { getNodeEnv } from "@/src/config/runtimeEnv";
 
 const getClient = () => {
   ensureAmplifyConfigured();

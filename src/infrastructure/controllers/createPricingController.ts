@@ -1,11 +1,11 @@
 "use client";
 
-import type { PricingController } from "@/src/application/pricingController";
+import type { PricingPort } from "@/src/application/interfaces/pricingPort";
 import { AmplifyPricingController } from "@/src/infrastructure/controllers/amplifyPricingController";
 
-let controller: PricingController | null = null;
+let controller: PricingPort | null = null;
 
-export function createPricingController(): PricingController {
+export function createPricingController(): PricingPort {
   if (controller) {
     return controller;
   }

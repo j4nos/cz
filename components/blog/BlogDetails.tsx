@@ -1,4 +1,4 @@
-import type { BlogPost } from "@/src/domain/content";
+import type { BlogPost } from "@/src/domain/entities/content";
 import styles from "./BlogDetails.module.css";
 
 type BlogDetailsProps = {

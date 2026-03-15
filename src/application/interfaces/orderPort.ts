@@ -1,6 +1,6 @@
 import type { Order } from "@/src/domain/entities";
 
-export interface OrderController {
+export interface OrderPort {
   placeOrder: (input: {
     investorId: string;
     listingId: string;

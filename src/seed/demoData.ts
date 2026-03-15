@@ -1,4 +1,4 @@
-import type { AssetDocument, BlogPost } from "@/src/domain/content";
+import type { AssetDocument, BlogPost } from "@/src/domain/entities/content";
 import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
 
 export interface ListingView extends Listing {
@@ -146,11 +146,6 @@ export const demoSeedOrders: Order[] = [
     currency: "EUR",
     investorWalletAddress: "0x123",
   },
-];
-
-export const demoFeaturedHomepageListings = [
-  { assetId: "asset-1", listingId: "listing-1" },
-  { assetId: "asset-2", listingId: "listing-2" },
 ];
 
 export const demoBlogPosts: BlogPost[] = [

@@ -1,5 +1,5 @@
 import { BlogList } from "@/components/blog/BlogList";
-import { listPublicBlogPosts } from "@/src/application/publicContent";
+import { listPublicBlogPosts } from "@/src/application/use-cases/publicContent";
 import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
 
 export const revalidate = 60;

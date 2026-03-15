@@ -13,9 +13,16 @@ import {
 } from "@/components/ui/Form";
 import { Table } from "@/components/ui/Table";
 import {
+  addPricingTierToState,
+  buildPricingTier,
+  getPricingStateError,
+  getPricingTierInputError,
+  removePricingTierFromState,
+} from "@/src/application/use-cases/pricingRules";
+import {
   type PricingTier,
   type ProductPricingState,
-} from "@/src/application/pricingState";
+} from "@/src/application/dto/pricingState";
 import { createPricingController } from "@/src/infrastructure/controllers/createPricingController";
 
 type Props = {
@@ -43,23 +50,10 @@ export function PricingEditor({
   useEffect(() => {
     async function load() {
       const controller = createPricingController();
-      console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.load:start", {
-        listingId,
-        preselectedProductId: preselectedProductId ?? null,
-        mode,
-      });
       const nextState = await controller.loadPricingState(
         listingId,
         preselectedProductId
       );
-      console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.load:result", {
-        listingId: nextState.listingId,
-        productId: nextState.productId ?? null,
-        name: nextState.name,
-        currency: nextState.currency,
-        unitPrice: nextState.unitPrice,
-        tierCount: nextState.tiers.length,
-      });
       setState(mode === "create" ? { ...nextState, productId: "" } : nextState);
     }
 
@@ -79,30 +73,15 @@ export function PricingEditor({
       return;
     }
 
-    console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.handleSave:start", {
-      listingId: state.listingId,
-      productId: state.productId ?? null,
-      name: state.name,
-      currency: state.currency,
-      unitPrice: state.unitPrice,
-      minPurchase: state.minPurchase,
-      maxPurchase: state.maxPurchase,
-      eligibleInvestorType: state.eligibleInvestorType,
-      supplyTotal: state.supplyTotal,
-      tierCount: state.tiers.length,
-    });
+    const pricingError = getPricingStateError(state);
+    if (pricingError) {
+      setError(pricingError);
+      return;
+    }
 
     try {
       setError("");
       const saved = await createPricingController().savePricingState(state);
-      console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.handleSave:result", {
-        listingId: saved.listingId,
-        productId: saved.productId ?? null,
-        name: saved.name,
-        currency: saved.currency,
-        unitPrice: saved.unitPrice,
-        tierCount: saved.tiers.length,
-      });
       setState(saved);
       setStatusMessage(saved.productId ? "Product saved." : "Product created.");
       if (saved.productId) {
@@ -124,45 +103,29 @@ export function PricingEditor({
     const nextMinQuantity = Number(minQuantity);
     const nextDiscountPercent = Number(discountPercent);
 
-    if (nextMinQuantity <= 0 || nextDiscountPercent < 0) {
-      setError("Tier values are invalid.");
+    const tierError = getPricingTierInputError({
+      minQuantity: nextMinQuantity,
+      discountPercent: nextDiscountPercent,
+    });
+    if (tierError) {
+      setError(tierError);
       return;
     }
 
-    const tier: PricingTier = {
-      id: `${state.listingId}-tier-${Date.now()}`,
+    const tier: PricingTier = buildPricingTier({
+      listingId: state.listingId,
       minQuantity: nextMinQuantity,
       discountPercent: nextDiscountPercent,
-    };
-
-    console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.handleAddTier", {
-      listingId: state.listingId,
-      productId: state.productId ?? null,
-      tier,
     });
 
-    setState((current) =>
-      current ? { ...current, tiers: [...current.tiers, tier] } : current
-    );
+    setState((current) => (current ? addPricingTierToState(current, tier) : current));
     setMinQuantity("1");
     setDiscountPercent("0");
     setStatusMessage("Pricing tier added.");
   }
 
   function handleRemoveTier(tierId: string) {
-    console.log("[PRODUCT_PRICING_DEBUG] PricingEditor.handleRemoveTier", {
-      listingId: state?.listingId ?? null,
-      productId: state?.productId ?? null,
-      tierId,
-    });
-    setState((current) =>
-      current
-        ? {
-            ...current,
-            tiers: current.tiers.filter((tier) => tier.id !== tierId),
-          }
-        : current
-    );
+    setState((current) => (current ? removePricingTierFromState(current, tierId) : current));
     setStatusMessage("Pricing tier removed.");
   }
 
@@ -367,7 +330,7 @@ export function PricingEditor({
           <PlainCta
             title="Delete product"
             text="Removes the selected product and all its pricing tiers."
-            actionLabel="DELETE PRODUCT"
+            actionLabel="Delete Product"
             href="#"
             onClick={handleDeleteProduct}
           />

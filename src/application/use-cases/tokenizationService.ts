@@ -1,9 +1,9 @@
 import type {
   AssetTokenizationRepository,
   TokenizationGateway,
-} from "@/src/application/tokenizationPorts";
-import { DomainError } from "@/src/domain/errors";
-import type { TokenizationResult } from "@/src/domain/tokenization";
+} from "@/src/application/interfaces/tokenizationPorts";
+import { DomainError } from "@/src/domain/value-objects/errors";
+import type { TokenizationResult } from "@/src/domain/entities/tokenization";
 
 export interface TokenizationIdGenerator {
   next(): string;

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { getPublicListingDetails } from "@/src/application/publicContent";
+import { getPublicListingDetails } from "@/src/application/use-cases/publicContent";
 import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
 import { InvestorListing } from "./InvestorListing";
 

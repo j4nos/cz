@@ -14,9 +14,9 @@ import {
   signUp,
 } from "aws-amplify/auth";
 
-import type { AuthClient, AuthUser } from "@/src/auth/client";
+import type { AuthClient, AuthUser } from "@/src/application/interfaces/authClient";
 import type { UserProfile } from "@/src/domain/entities";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
 const listeners = new Set<(user: AuthUser | null) => void>();
@@ -36,11 +36,8 @@ async function readCurrentUser(): Promise<AuthUser | null> {
   try {
     ensureAmplifyConfigured();
     const user = await getAmplifyCurrentUser();
-    const mapped = mapCurrentUser(user);
-    console.log("[AUTH_DEBUG] readCurrentUser success", mapped);
-    return mapped;
+    return mapCurrentUser(user);
   } catch {
-    console.log("[AUTH_DEBUG] readCurrentUser miss");
     return null;
   }
 }
@@ -54,21 +51,14 @@ async function readUserFromSession(): Promise<AuthUser | null> {
     const email = typeof payload?.email === "string" ? payload.email : undefined;
 
     if (!uid) {
-      console.log("[AUTH_DEBUG] readUserFromSession no uid", {
-        hasAccessToken: Boolean(session.tokens?.accessToken),
-        hasIdToken: Boolean(session.tokens?.idToken),
-      });
       return null;
     }
 
-    const mapped = {
+    return {
       uid,
       email,
     };
-    console.log("[AUTH_DEBUG] readUserFromSession success", mapped);
-    return mapped;
   } catch {
-    console.log("[AUTH_DEBUG] readUserFromSession miss");
     return null;
   }
 }
@@ -88,7 +78,6 @@ async function waitForCurrentUser(retries = 10, delayMs = 150): Promise<AuthUser
 
 async function notify() {
   const user = await readCurrentUser();
-  console.log("[AUTH_DEBUG] notify listeners", user);
   listeners.forEach((listener) => {
     listener(user);
   });
@@ -103,14 +92,11 @@ export function createAmplifyAuthClient(): AuthClient {
       listeners.add(handler);
       void readCurrentUser().then((user) => {
         cachedUser = user;
-        console.log("[AUTH_DEBUG] onAuthStateChanged initial", user);
         handler(user);
       });
       const cancelHub = Hub.listen("auth", (event) => {
-        console.log("[AUTH_DEBUG] Hub auth event", event.payload?.event);
         void readCurrentUser().then((user) => {
           cachedUser = user;
-          console.log("[AUTH_DEBUG] onAuthStateChanged hub refresh", user);
           handler(user);
         });
       });
@@ -124,18 +110,14 @@ export function createAmplifyAuthClient(): AuthClient {
       try {
         ensureAmplifyConfigured();
         const session = await fetchAuthSession();
-        console.log("[AUTH_DEBUG] getAccessToken", Boolean(session.tokens?.accessToken));
         return session.tokens?.accessToken?.toString() ?? null;
       } catch {
-        console.log("[AUTH_DEBUG] getAccessToken miss");
         return null;
       }
     },
     async signInWithEmailAndPassword(email: string, password: string) {
       ensureAmplifyConfigured();
-      console.log("[AUTH_DEBUG] signIn start", { email });
       const result = await signIn({ username: email, password });
-      console.log("[AUTH_DEBUG] signIn result", result);
 
       if (result.nextStep.signInStep === "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED") {
         await confirmSignIn({ challengeResponse: password });
@@ -146,7 +128,6 @@ export function createAmplifyAuthClient(): AuthClient {
       }
 
       const user = await waitForCurrentUser();
-      console.log("[AUTH_DEBUG] signIn waitForCurrentUser result", user);
       if (!user) {
         throw new Error("Amplify login completed without an authenticated user.");
       }
@@ -195,7 +176,6 @@ export function createAmplifyAuthClient(): AuthClient {
     },
     async signOut() {
       ensureAmplifyConfigured();
-      console.log("[AUTH_DEBUG] signOut start");
       await signOut();
       cachedUser = null;
       await notify();

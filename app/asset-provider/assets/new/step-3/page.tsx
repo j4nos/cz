@@ -52,9 +52,6 @@ function Step3Content() {
       return;
     }
 
-    updateState({
-      documents: [...state.documents, `${docType}:${file.name}`],
-    });
     setToast("Document uploaded", "success", 2000);
     setFile(null);
   }

@@ -1,4 +1,4 @@
-import type { InvestmentRepository } from "@/src/application/ports";
+import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
 import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
 
 export class InMemoryInvestmentRepository implements InvestmentRepository {
@@ -78,6 +78,16 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
 
   async getOrderById(id: string): Promise<Order | null> {
     return this.copyOrNull(this.orders.get(id));
+  }
+
+  async findOrderByPaymentProviderId(paymentProviderId: string): Promise<Order | null> {
+    for (const order of Array.from(this.orders.values())) {
+      if (order.paymentProviderId === paymentProviderId) {
+        return { ...order };
+      }
+    }
+
+    return null;
   }
 
   async updateOrder(order: Order): Promise<Order> {

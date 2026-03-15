@@ -1,6 +1,6 @@
 import type { Asset, Listing, Order, Product } from "@/src/domain/entities";
 
-export interface ReadController {
+export interface ReadPort {
   listAssets: () => Promise<Asset[]>;
   getAssetById: (assetId: string) => Promise<Asset | null>;
   getListingById: (listingId: string) => Promise<Listing | null>;

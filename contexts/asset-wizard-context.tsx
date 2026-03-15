@@ -15,8 +15,6 @@ export interface AssetWizardState {
   country: string;
   assetClass: string;
   tokenStandard: string;
-  photos: string[];
-  documents: string[];
 }
 
 interface AssetWizardContextValue {
@@ -33,8 +31,6 @@ const defaultState: AssetWizardState = {
   country: "",
   assetClass: "REAL_ESTATE",
   tokenStandard: "ERC-20",
-  photos: [],
-  documents: [],
 };
 
 const AssetWizardContext = createContext<AssetWizardContextValue | null>(null);

@@ -1,4 +1,4 @@
-export type UserRole = "ASSET_PROVIDER" | "INVESTOR";
+export type UserRole = "ASSET_PROVIDER" | "INVESTOR" | "platform-admin";
 
 export type KycStatus =
   | "not-started"

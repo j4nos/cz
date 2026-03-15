@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-import { getAnonSessionSecret } from "@/src/infrastructure/config/anonSessionEnv";
+import { getAnonSessionSecret } from "@/src/config/anonSessionEnv";
 
 const COOKIE_NAME = "cz_anon";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7;

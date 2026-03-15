@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 
 import { WithdrawPopup } from "@/components/WithdrawPopup";
 import { Button } from "@/components/ui/Button";
 import { Table } from "@/components/ui/Table";
+import { OwnershipMintingService } from "@/src/application/use-cases/ownershipMintingService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLoading } from "@/contexts/LoadingContext";
 import { useToast } from "@/contexts/ToastContext";
@@ -16,6 +17,29 @@ export default function InvestorPortfolioPage() {
   const { activeUser, accessToken, loading } = useAuth();
   const { setToast } = useToast();
   const { setLoading } = useLoading();
+  const readController = useMemo(() => createReadController(), []);
+  const ownershipMintingService = useMemo(
+    () =>
+      new OwnershipMintingService(
+        readController,
+        async ({ accessToken: currentAccessToken, body }) => {
+          const response = await fetch("/api/mint-ownership", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${currentAccessToken}`,
+            },
+            body: JSON.stringify(body),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(result?.error || "Mint API error");
+          }
+          return result;
+        },
+      ),
+    [readController],
+  );
   const [orders, setOrders] = useState<Order[]>([]);
   const [tokenHoldings, setTokenHoldings] = useState<
     Array<{
@@ -60,8 +84,7 @@ export default function InvestorPortfolioPage() {
       }
 
       try {
-        const controller = createReadController();
-        const next = (await controller.listOrdersByInvestor(activeUser.uid)).filter(
+        const next = (await readController.listOrdersByInvestor(activeUser.uid)).filter(
           (order) => order.status === "paid",
         );
 
@@ -71,14 +94,14 @@ export default function InvestorPortfolioPage() {
           (order) => order.investorWalletAddress || order.withdrawnAt || order.mintedAt,
         );
         const listingIds = Array.from(new Set(eligibleOrders.map((order) => order.listingId).filter(Boolean)));
-        const listings = await Promise.all(listingIds.map((listingId) => controller.getListingById(listingId)));
+        const listings = await Promise.all(listingIds.map((listingId) => readController.getListingById(listingId)));
         const listingById = new Map(
           listings
             .filter((listing): listing is NonNullable<typeof listing> => Boolean(listing))
             .map((listing) => [listing.id, listing]),
         );
         const assetIds = Array.from(new Set(listings.map((listing) => listing?.assetId).filter(Boolean)));
-        const assets = await Promise.all(assetIds.map((assetId) => controller.getAssetById(assetId as string)));
+        const assets = await Promise.all(assetIds.map((assetId) => readController.getAssetById(assetId as string)));
         const assetById = new Map(
           assets.filter((asset): asset is NonNullable<typeof asset> => Boolean(asset)).map((asset) => [asset.id, asset]),
         );
@@ -129,7 +152,7 @@ export default function InvestorPortfolioPage() {
     }
 
     void load();
-  }, [activeUser, setLoading]);
+  }, [activeUser, readController, setLoading]);
 
   if (loading) {
     return null;
@@ -150,61 +173,27 @@ export default function InvestorPortfolioPage() {
       return;
     }
 
-    const controller = createReadController();
     const order = orders.find((item) => item.id === withdrawOrderId);
-    let tokenAddress = tokenAddressByListingId[order?.listingId ?? ""];
-    let tokenStandard: "erc-20" | "erc-721" = "erc-20";
-
-    if (!tokenAddress && order?.listingId) {
-      const listing = await controller.getListingById(order.listingId);
-      const asset = listing ? await controller.getAssetById(listing.assetId) : null;
-      tokenAddress = asset?.tokenAddress ?? "";
-      if (asset?.tokenStandard === "erc-721") {
-        tokenStandard = "erc-721";
-      }
-      if (tokenAddress) {
-        setTokenAddressByListingId((current) => ({
-          ...current,
-          [order.listingId]: tokenAddress as string,
-        }));
-      }
-    }
-
-    if (!tokenAddress) {
-      setToast("Missing token address for this listing.", "danger", 2500);
-      return;
-    }
 
     setWithdrawLoading(true);
     try {
-      if (!accessToken) {
-        throw new Error("Missing access token.");
-      }
-
-      const response = await fetch("/api/mint-ownership", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          tokenAddress,
-          to: walletAddress.trim(),
-          amount: order?.quantity,
-          orderId: withdrawOrderId,
-          tokenStandard,
-        }),
+      const result = await ownershipMintingService.mint({
+        order: order ?? null,
+        walletAddress,
+        accessToken,
+        knownTokenAddress: tokenAddressByListingId[order?.listingId ?? ""],
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result?.error || "Mint API error");
+      if (result.kind === "error") {
+        setToast(result.message, "danger", 2500);
+        return;
       }
 
       const nextMintRequestedAt =
-        typeof result?.mintRequestedAt === "string" ? result.mintRequestedAt : null;
-      const nextMintedAt = typeof result?.mintedAt === "string" ? result.mintedAt : null;
+        typeof result.result.mintRequestedAt === "string" ? result.result.mintRequestedAt : null;
+      const nextMintedAt =
+        typeof result.result.mintedAt === "string" ? result.result.mintedAt : null;
 
-      if (result?.status === "minted" || nextMintedAt) {
+      if (result.result.status === "minted" || nextMintedAt) {
         setOrders((current) =>
           current.map((item) =>
             item.id === withdrawOrderId
@@ -233,13 +222,19 @@ export default function InvestorPortfolioPage() {
         );
       }
 
-      const listing = order?.listingId ? await controller.getListingById(order.listingId) : null;
-      const resolvedAssetId = listing?.assetId ?? "";
+      if (order?.listingId && result.tokenAddress) {
+        setTokenAddressByListingId((current) => ({
+          ...current,
+          [order.listingId]: result.tokenAddress,
+        }));
+      }
+
+      const resolvedAssetId = result.listing?.assetId ?? "";
       setTokenHoldings((current) => {
         const exists = current.find((item) => item.orderId === order?.id);
         const nextEntry = {
           orderId: order?.id ?? "",
-          tokenAddress,
+          tokenAddress: result.tokenAddress,
           assetId: resolvedAssetId,
           listingId: order?.listingId ?? "",
           quantity: order?.quantity ?? 0,
@@ -250,12 +245,11 @@ export default function InvestorPortfolioPage() {
         return [...current, nextEntry];
       });
 
-      const txHash = typeof result?.txHash === "string" ? result.txHash : "";
-      if (result?.status === "queued" || result?.status === "pending") {
-        setToast("Withdraw queued for minting.", "warning", 3500);
-      } else {
-        setToast(txHash ? `Withdraw initiated. Tx: ${txHash}` : "Withdraw initiated on-chain.", "success", 4000);
-      }
+      setToast(
+        result.toast.message,
+        result.toast.tone,
+        result.toast.tone === "warning" ? 3500 : 4000,
+      );
       setWithdrawOrderId(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Withdraw failed.";

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { Table } from "@/components/ui/Table";
-import type { BlogPost } from "@/src/domain/content";
+import type { BlogPost } from "@/src/domain/entities/content";
 
 import styles from "./BlogPostsTable.module.css";
 

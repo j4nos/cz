@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { AssetTokenizationRepository, TokenizationGateway } from "@/src/application/tokenizationPorts";
-import { TokenizationService } from "@/src/application/tokenizationService";
+import type { AssetTokenizationRepository, TokenizationGateway } from "@/src/application/interfaces/tokenizationPorts";
+import { TokenizationService } from "@/src/application/use-cases/tokenizationService";
 import type { Asset } from "@/src/domain/entities";
-import { DomainError } from "@/src/domain/errors";
+import { DomainError } from "@/src/domain/value-objects/errors";
 
 class FakeAssetTokenizationRepository implements AssetTokenizationRepository {
   constructor(private readonly asset: Asset | null) {}
@@ -57,7 +57,7 @@ describe("TokenizationService", () => {
       country: "HU",
       assetClass: "REAL_ESTATE",
       tokenStandard: "ERC-721",
-      status: "DRAFT",
+      status: "draft",
       missingDocsCount: 0,
       imageUrls: [],
     });
@@ -89,7 +89,7 @@ describe("TokenizationService", () => {
       name: "Budapest Office",
       country: "HU",
       assetClass: "REAL_ESTATE",
-      status: "DRAFT",
+      status: "draft",
       missingDocsCount: 0,
       imageUrls: [],
     });

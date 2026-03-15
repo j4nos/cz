@@ -1,11 +1,11 @@
 "use client";
 
-import type { ListingController } from "@/src/application/listingController";
+import type { ListingPort } from "@/src/application/interfaces/listingPort";
 import { AmplifyListingController } from "@/src/infrastructure/controllers/amplifyListingController";
 
-let controller: ListingController | null = null;
+let controller: ListingPort | null = null;
 
-export function createListingController(): ListingController {
+export function createListingController(): ListingPort {
   if (controller) {
     return controller;
   }

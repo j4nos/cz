@@ -1,6 +1,6 @@
 import type { Listing } from "@/src/domain/entities";
 
-export interface ListingController {
+export interface ListingPort {
   createListingDraft: (input: {
     assetId: string;
     title: string;

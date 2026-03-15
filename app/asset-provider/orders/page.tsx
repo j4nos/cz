@@ -1,17 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Table } from "@/components/ui/Table";
+import { OwnershipMintingService } from "@/src/application/use-cases/ownershipMintingService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLoading } from "@/contexts/LoadingContext";
 import type { Order, Product } from "@/src/domain/entities";
+import { createOrderController } from "@/src/infrastructure/controllers/createOrderController";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 
 export default function AssetProviderOrdersPage() {
   const { user, loading, accessToken } = useAuth();
   const { setLoading } = useLoading();
+  const readController = useMemo(() => createReadController(), []);
+  const orderController = useMemo(() => createOrderController(), []);
+  const ownershipMintingService = useMemo(
+    () =>
+      new OwnershipMintingService(
+        readController,
+        async ({ accessToken: currentAccessToken, body }) => {
+          const response = await fetch("/api/mint-ownership", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${currentAccessToken}`,
+            },
+            body: JSON.stringify(body),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(result?.error || "Mint API error");
+          }
+          return result;
+        },
+      ),
+    [readController],
+  );
   const [orders, setOrders] = useState<Order[]>([]);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [productsById, setProductsById] = useState<Record<string, Product>>({});
@@ -33,8 +59,7 @@ export default function AssetProviderOrdersPage() {
         return;
       }
       try {
-        const controller = createReadController();
-        const next = await controller.listOrdersByProvider(user.uid);
+        const next = await readController.listOrdersByProvider(user.uid);
         next.sort(
           (a, b) =>
             new Date(b.createdAt ?? 0).getTime() -
@@ -48,7 +73,7 @@ export default function AssetProviderOrdersPage() {
         const productEntries = await Promise.all(
           uniqueProductIds.map(
             async (productId) =>
-              [productId, await controller.getProductById(productId)] as const
+              [productId, await readController.getProductById(productId)] as const
           )
         );
         setProductsById(
@@ -63,7 +88,7 @@ export default function AssetProviderOrdersPage() {
       }
     }
     void load();
-  }, [user, setLoading]);
+  }, [readController, setLoading, user]);
 
   async function handleMarkPaid(orderId: string) {
     if (!user) {
@@ -71,17 +96,12 @@ export default function AssetProviderOrdersPage() {
     }
     setUpdatingId(orderId);
     try {
-      const controller = createReadController();
-      const currentOrder = await controller.getOrderById(orderId);
+      const currentOrder = await readController.getOrderById(orderId);
       if (!currentOrder) {
         return;
       }
 
-      const paidOrder = {
-        ...currentOrder,
-        status: "paid" as const,
-      };
-      await controller.updateOrder(paidOrder);
+      const paidOrder = await orderController.completeOrder(currentOrder.id);
 
       const updatedOrders = orders.map((item) =>
         item.id === orderId ? paidOrder : item
@@ -98,33 +118,34 @@ export default function AssetProviderOrdersPage() {
   }
 
   async function mintOwnershipIfPossible(order: Order) {
-    if (!order.investorWalletAddress) {
-      return;
-    }
-    const controller = createReadController();
-    const listing = await controller.getListingById(order.listingId);
-    if (!listing) return;
-    const asset = await controller.getAssetById(listing.assetId);
-    if (!asset?.tokenAddress) return;
-
-    if (!accessToken) {
-      return;
-    }
-
-    await fetch("/api/mint-ownership", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        tokenAddress: asset.tokenAddress,
-        to: order.investorWalletAddress,
-        amount: order.quantity,
-        orderId: order.id,
-        tokenStandard: asset.tokenStandard ?? "erc-20",
-      }),
+    const result = await ownershipMintingService.mint({
+      order,
+      accessToken,
     });
+    if (result.kind === "success" && result.result.mintedAt) {
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                mintRequestedAt: result.result.mintRequestedAt ?? item.mintRequestedAt,
+                mintedAt: result.result.mintedAt ?? item.mintedAt,
+              }
+            : item,
+        ),
+      );
+    } else if (result.kind === "success" && result.result.mintRequestedAt) {
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                mintRequestedAt: result.result.mintRequestedAt ?? item.mintRequestedAt,
+              }
+            : item,
+        ),
+      );
+    }
   }
 
   if (loading) {

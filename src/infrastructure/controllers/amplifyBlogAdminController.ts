@@ -1,10 +1,10 @@
 "use client";
 
-import type { BlogAdminController } from "@/src/application/blogAdminController";
-import type { BlogPost } from "@/src/domain/content";
+import type { BlogAdminPort } from "@/src/application/interfaces/blogAdminPort";
+import type { BlogPost } from "@/src/domain/entities/content";
 import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
-export class AmplifyBlogAdminController implements BlogAdminController {
+export class AmplifyBlogAdminController implements BlogAdminPort {
   constructor(private readonly repository: AmplifyInvestmentRepository = new AmplifyInvestmentRepository()) {}
 
   async listBlogPosts(): Promise<BlogPost[]> {

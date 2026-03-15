@@ -1,11 +1,11 @@
 "use client";
 
-import type { ReadController } from "@/src/application/readController";
+import type { ReadPort } from "@/src/application/interfaces/readPort";
 import { AmplifyReadController } from "@/src/infrastructure/controllers/amplifyReadController";
 
-let controller: ReadController | null = null;
+let controller: ReadPort | null = null;
 
-export function createReadController(): ReadController {
+export function createReadController(): ReadPort {
   if (controller) {
     return controller;
   }

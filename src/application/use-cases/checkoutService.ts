@@ -1,0 +1,134 @@
+import {
+  getCheckoutPaymentOptions,
+  getCheckoutSubmissionError,
+  getDefaultCheckoutPaymentType,
+  getDefaultCheckoutQuantity,
+  getSelectedCheckoutProduct,
+  type CheckoutPaymentOption,
+  type CheckoutPaymentType,
+} from "@/src/application/use-cases/checkoutRules";
+import type { AuthClient } from "@/src/application/interfaces/authClient";
+import type { Asset, Listing, Product } from "@/src/domain/entities";
+import type { OrderPort } from "@/src/application/interfaces/orderPort";
+import type { ReadPort } from "@/src/application/interfaces/readPort";
+
+type LoadCheckoutInput = {
+  listingId: string;
+  requestedProductId?: string;
+  initialQuantity?: number;
+};
+
+type SubmitCheckoutInput = {
+  listing: Listing | null;
+  asset: Asset | null;
+  product: Product | null;
+  quantity: number;
+  paymentType: CheckoutPaymentType;
+  activeUserId?: string;
+  authLoading: boolean;
+  accessToken?: string | null;
+};
+
+type CreatePaymentResult = {
+  redirectUrl?: string;
+  error?: string;
+};
+
+export class CheckoutService {
+  constructor(
+    private readonly readController: ReadPort,
+    private readonly orderController: OrderPort,
+    private readonly authClient: AuthClient,
+    private readonly createBankTransferPayment: (input: {
+      orderId: string;
+      accessToken: string;
+    }) => Promise<CreatePaymentResult>,
+  ) {}
+
+  async loadCheckout(input: LoadCheckoutInput): Promise<{
+    listing: Listing | null;
+    asset: Asset | null;
+    products: Product[];
+    providerName: string | null;
+    selectedProductId: string;
+    quantity: string;
+    paymentType: CheckoutPaymentType;
+    paymentOptions: CheckoutPaymentOption[];
+  }> {
+    const listing = await this.readController.getListingById(input.listingId);
+    const asset = listing?.assetId
+      ? await this.readController.getAssetById(listing.assetId)
+      : null;
+    const products = await this.readController.listProductsByListingId(input.listingId);
+    const selectedProduct = getSelectedCheckoutProduct(products, input.requestedProductId);
+    const providerProfile = asset?.tenantUserId
+      ? await this.authClient.getUserProfile(asset.tenantUserId).catch(() => null)
+      : null;
+    const providerName = providerProfile?.companyName?.trim() || null;
+
+    return {
+      listing,
+      asset,
+      products,
+      providerName,
+      selectedProductId: selectedProduct?.id ?? "",
+      quantity: getDefaultCheckoutQuantity(selectedProduct, input.initialQuantity),
+      paymentType: getDefaultCheckoutPaymentType(asset, undefined),
+      paymentOptions: getCheckoutPaymentOptions(asset),
+    };
+  }
+
+  async submitCheckout(input: SubmitCheckoutInput): Promise<
+    | { kind: "error"; message: string; tone: "warning" | "danger"; redirectToLogin?: boolean }
+    | { kind: "redirect"; url: string }
+    | { kind: "success"; orderId: string }
+  > {
+    const submission = getCheckoutSubmissionError({
+      listing: input.listing,
+      product: input.product,
+      activeUserId: input.activeUserId,
+      authLoading: input.authLoading,
+      paymentType: input.paymentType,
+      asset: input.asset,
+      accessToken: input.accessToken,
+    });
+
+    if (submission.error) {
+      return {
+        kind: "error",
+        message: submission.error,
+        tone: submission.shouldRedirectToLogin ? "warning" : "danger",
+        redirectToLogin: submission.shouldRedirectToLogin,
+      };
+    }
+
+    if (!input.listing || !input.product || !input.activeUserId) {
+      return { kind: "error", message: "Unable to place order.", tone: "danger" };
+    }
+
+    const order = await this.orderController.placeOrder({
+      investorId: input.activeUserId,
+      listingId: input.listing.id,
+      productId: input.product.id,
+      quantity: input.quantity,
+      paymentProvider: input.paymentType,
+    });
+
+    if (input.paymentType === "bank-transfer") {
+      const payment = await this.createBankTransferPayment({
+        orderId: order.id,
+        accessToken: input.accessToken!,
+      });
+      if (!payment.redirectUrl) {
+        return {
+          kind: "error",
+          message: payment.error || "Failed to start bank transfer.",
+          tone: "danger",
+        };
+      }
+      return { kind: "redirect", url: payment.redirectUrl };
+    }
+
+    return { kind: "success", orderId: order.id };
+  }
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { InvestmentPlatformService } from "@/src/application/useCases";
-import { DomainError } from "@/src/domain/errors";
+import { InvestmentPlatformService } from "@/src/application/use-cases/investmentPlatformService";
+import { DomainError } from "@/src/domain/value-objects/errors";
 import { InMemoryInvestmentRepository } from "@/src/infrastructure/inMemoryInvestmentRepository";
 
 class FixedIdGenerator {

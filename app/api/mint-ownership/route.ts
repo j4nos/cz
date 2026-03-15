@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import type { Schema } from "@/amplify/data/resource";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 
 export const runtime = "nodejs";
 

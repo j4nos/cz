@@ -1,7 +1,7 @@
 "use client";
 
-import type { OrderController } from "@/src/application/orderController";
-import { InvestmentPlatformService } from "@/src/application/useCases";
+import type { OrderPort } from "@/src/application/interfaces/orderPort";
+import { InvestmentPlatformService } from "@/src/application/use-cases/investmentPlatformService";
 import type { Order } from "@/src/domain/entities";
 import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
@@ -17,7 +17,7 @@ class AmplifyClock {
   }
 }
 
-export class AmplifyOrderController implements OrderController {
+export class AmplifyOrderController implements OrderPort {
   private readonly repository = new AmplifyInvestmentRepository();
   private readonly service = new InvestmentPlatformService(this.repository, new AmplifyIdGenerator(), new AmplifyClock());
 

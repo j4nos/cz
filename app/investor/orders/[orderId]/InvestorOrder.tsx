@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { KeyValueList } from "@/components/ui/KeyValueList";
 import { useAuth } from "@/contexts/AuthContext";
-import type { PublicListingWithAsset } from "@/src/application/publicContent";
+import type { PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
 import type { Order } from "@/src/domain/entities";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 

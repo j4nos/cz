@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { TokenizationService } from "@/src/application/tokenizationService";
+import { TokenizationService } from "@/src/application/use-cases/tokenizationService";
 import { EthersTokenizationGateway } from "@/src/infrastructure/gateways/ethersTokenizationGateway";
 import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
-import { DomainError } from "@/src/domain/errors";
+import { DomainError } from "@/src/domain/value-objects/errors";
 
 export const runtime = "nodejs";
 

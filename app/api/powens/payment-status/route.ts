@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { generateClient } from "aws-amplify/data";
 
 import type { Schema } from "@/amplify/data/resource";
-import { ensureAmplifyConfigured } from "@/src/infrastructure/amplify/config";
+import { PowensPaymentSyncService } from "@/src/application/use-cases/powensPaymentSyncService";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
-import { getPowensEnv } from "@/src/infrastructure/config/powensEnv";
+import { getPowensEnv } from "@/src/config/powensEnv";
+import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
 export const runtime = "nodejs";
 
@@ -23,26 +25,6 @@ type PowensPaymentResponse = {
   state?: string;
   error?: string;
   message?: string;
-};
-
-const normalizeState = (state?: string) => (state || "").toLowerCase();
-
-const mapPaymentStateToOrderStatus = (state?: string) => {
-  switch (normalizeState(state)) {
-    case "done":
-      return "paid";
-    case "rejected":
-    case "cancelled":
-    case "canceled":
-      return "failed";
-    case "created":
-    case "pending":
-    case "accepted":
-    case "validating":
-      return "pending";
-    default:
-      return undefined;
-  }
 };
 
 const getPowensTokenUrl = (baseUrl: string) =>
@@ -139,16 +121,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const nextStatus = mapPaymentStateToOrderStatus(paymentData.state);
-    await client.models.Order.update({
-      id: order.id,
-      status: nextStatus ?? order.status ?? "pending",
-      paymentProviderStatus: paymentData.state ?? order.paymentProviderStatus ?? "",
+    const service = new PowensPaymentSyncService(new AmplifyInvestmentRepository());
+    const syncedOrder = await service.syncByOrderId({
+      orderId: order.id,
+      paymentState: paymentData.state,
     });
 
     return NextResponse.json({
       paymentState: paymentData.state ?? "",
-      orderStatus: nextStatus ?? order.status ?? "pending",
+      orderStatus: syncedOrder?.status ?? order.status ?? "pending",
     });
   } catch (error) {
     console.error("[powens] payment-status failed", error);

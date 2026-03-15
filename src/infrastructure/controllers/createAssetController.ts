@@ -1,11 +1,11 @@
 "use client";
 
-import type { AssetController } from "@/src/application/assetController";
+import type { AssetPort } from "@/src/application/interfaces/assetPort";
 import { AmplifyAssetController } from "@/src/infrastructure/controllers/amplifyAssetController";
 
-let controller: AssetController | null = null;
+let controller: AssetPort | null = null;
 
-export function createAssetController(): AssetController {
+export function createAssetController(): AssetPort {
   if (controller) {
     return controller;
   }

@@ -1,4 +1,4 @@
-import type { ChatMessage, ChatThreadSummary } from "@/src/domain/chat";
+import type { ChatMessage, ChatThreadSummary } from "@/src/domain/entities/chat";
 
 export interface ChatRepository {
   getThread(threadId: string): Promise<ChatThreadSummary | null>;

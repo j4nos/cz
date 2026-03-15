@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 
-import type { TokenizationGateway } from "@/src/application/tokenizationPorts";
-import { DomainError } from "@/src/domain/errors";
+import type { TokenizationGateway } from "@/src/application/interfaces/tokenizationPorts";
+import { DomainError } from "@/src/domain/value-objects/errors";
 import erc20Artifact from "@/artifacts/contracts/AssetToken20.sol/AssetToken20.json";
 import erc721Artifact from "@/artifacts/contracts/AssetToken721.sol/AssetToken721.json";
 

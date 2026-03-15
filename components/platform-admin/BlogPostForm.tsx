@@ -10,25 +10,15 @@ import {
   FormSelect,
   FormTextarea,
 } from "@/components/ui/Form";
-import { useToast } from "@/contexts/ToastContext";
-import type { BlogPost } from "@/src/domain/content";
+import type { BlogPostEditorInput } from "@/src/application/use-cases/blogPostAdminService";
+import type { BlogPost } from "@/src/domain/entities/content";
 
 import styles from "./BlogPostForm.module.css";
-
-export type BlogPostFormInput = {
-  id?: string;
-  title: string;
-  excerpt: string;
-  coverImage: string;
-  contentHtml: string;
-  publishedAt: string;
-  status: "draft" | "published";
-};
 
 type BlogPostFormProps = {
   initialPost?: BlogPost | null;
   saving?: boolean;
-  onSubmit: (values: BlogPostFormInput, coverFile: File | null) => Promise<void>;
+  onSubmit: (values: BlogPostEditorInput, coverFile: File | null) => Promise<void>;
   onCancelEdit?: () => void;
 };
 
@@ -61,7 +51,6 @@ export function BlogPostForm({
   const [publishedAt, setPublishedAt] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const { setToast } = useToast();
 
   const isEditing = Boolean(initialPost?.id);
   const initialPublishedAt = useMemo(
@@ -81,29 +70,12 @@ export function BlogPostForm({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const existingCoverImage = initialPost?.coverImage?.trim() ?? "";
-    const nextCoverImage = coverImage.trim() || existingCoverImage;
-    const hasCoverImage = Boolean(nextCoverImage || coverFile);
-
-    if (!title.trim() || !excerpt.trim() || !contentHtml.trim()) {
-      setToast("Title, excerpt and HTML content are required.", "danger", 2400);
-      return;
-    }
-    if (!publishedAt) {
-      setToast("Publish date is required.", "danger", 2400);
-      return;
-    }
-    if (!hasCoverImage) {
-      setToast("Add a cover image URL or upload a file.", "danger", 2400);
-      return;
-    }
-
     await onSubmit(
       {
         id: initialPost?.id,
         title: title.trim(),
         excerpt: excerpt.trim(),
-        coverImage: nextCoverImage,
+        coverImage: coverImage.trim() || initialPost?.coverImage?.trim() || "",
         contentHtml,
         publishedAt: fromLocalDateTimeInput(publishedAt),
         status,
