@@ -1,4 +1,11 @@
-import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
+import type {
+  Asset,
+  Listing,
+  MintRequest,
+  Order,
+  Product,
+  UserProfile,
+} from "@/src/domain/entities";
 
 export interface InvestmentRepository {
   createUserProfile(input: UserProfile): Promise<UserProfile>;
@@ -18,5 +25,15 @@ export interface InvestmentRepository {
   createOrder(input: Order): Promise<Order>;
   getOrderById(id: string): Promise<Order | null>;
   findOrderByPaymentProviderId(paymentProviderId: string): Promise<Order | null>;
+  getMintRequestById(id: string): Promise<MintRequest | null>;
+  createMintRequestIfMissing(input: {
+    requestId: string;
+    orderId: string;
+    assetId: string;
+    idempotencyKey: string;
+    walletAddress?: string;
+    createdAt: string;
+  }): Promise<{ request: MintRequest | null; created: boolean }>;
+  updateMintRequest(input: MintRequest): Promise<MintRequest>;
   updateOrder(order: Order): Promise<Order>;
 }

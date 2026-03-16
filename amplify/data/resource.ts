@@ -62,6 +62,7 @@ const schema = a.schema({
       listings: a.hasMany("Listing", "assetId"),
       documents: a.hasMany("DocumentMeta", "assetId"),
       dueDiligenceRuns: a.hasMany("DueDiligenceRun", "assetId"),
+      contractDeploymentRequests: a.hasMany("ContractDeploymentRequest", "assetId"),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 
@@ -145,6 +146,41 @@ const schema = a.schema({
       providerUser: a.belongsTo("UserProfile", "providerUserId"),
       listing: a.belongsTo("Listing", "listingId"),
       product: a.belongsTo("Product", "productId"),
+      mintRequests: a.hasMany("MintRequest", "orderId"),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  ContractDeploymentRequest: a
+    .model({
+      assetId: a.id().required(),
+      idempotencyKey: a.string().required(),
+      deploymentStatus: a.string().required(),
+      runId: a.string().required(),
+      tokenStandard: a.string(),
+      tokenAddress: a.string(),
+      errorCode: a.string(),
+      errorMessage: a.string(),
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+      asset: a.belongsTo("Asset", "assetId"),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  MintRequest: a
+    .model({
+      orderId: a.id().required(),
+      assetId: a.id().required(),
+      idempotencyKey: a.string().required(),
+      mintStatus: a.string().required(),
+      walletAddress: a.string(),
+      blockchainTxHash: a.string(),
+      tokenId: a.string(),
+      retryCount: a.integer(),
+      errorCode: a.string(),
+      errorMessage: a.string(),
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+      order: a.belongsTo("Order", "orderId"),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 

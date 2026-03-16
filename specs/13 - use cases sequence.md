@@ -186,7 +186,9 @@ sequenceDiagram
   participant ContractDeploymentService
   participant contractDeploymentRules
   participant TokenizeAssetAPI
-  participant AssetRepository
+  participant TokenizationService
+  participant AssetTokenizationRepository
+  participant TokenizationGateway
 
   UI->>ContractDeploymentService: submit(input)
   ContractDeploymentService->>contractDeploymentRules: getContractDeploymentError(input)
@@ -194,14 +196,64 @@ sequenceDiagram
     ContractDeploymentService-->>UI: { kind: error }
   else deploy needed
     ContractDeploymentService->>TokenizeAssetAPI: deployContract(payload)
+    TokenizeAssetAPI->>TokenizationService: tokenizeAsset(input)
+    TokenizationService->>AssetTokenizationRepository: getAssetById(assetId)
+    TokenizationService->>AssetTokenizationRepository: createContractDeploymentRequestIfMissing({ requestId: "contract-deployment:{assetId}", idempotencyKey, latestRunId })
+    alt existing ContractDeploymentRequest
+      AssetTokenizationRepository-->>TokenizationService: { request, created: false }
+      alt request.tokenAddress exists
+        TokenizationService-->>TokenizeAssetAPI: existing TokenizationResult
+      else request in progress
+        TokenizationService-->>TokenizeAssetAPI: DomainError("Contract deployment already in progress.")
+      end
+    else new ContractDeploymentRequest created
+      AssetTokenizationRepository-->>TokenizationService: { request, created: true }
+      TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitting)
+      TokenizationService->>TokenizationGateway: tokenize(payload)
+      TokenizationGateway-->>TokenizationService: deployed contract
+      TokenizationService->>AssetTokenizationRepository: updateAssetTokenization({ assetId, tokenAddress, latestRunId })
+      TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitted)
+      TokenizationService-->>TokenizeAssetAPI: TokenizationResult
+    end
     TokenizeAssetAPI-->>ContractDeploymentService: address
-    ContractDeploymentService->>AssetRepository: updateAsset(assetAfterContractDeployment)
-    AssetRepository-->>ContractDeploymentService: Asset
     ContractDeploymentService-->>UI: { kind: success, asset }
   else deploy not needed
-    ContractDeploymentService->>AssetRepository: updateAsset(assetAfterContractDeployment)
-    AssetRepository-->>ContractDeploymentService: Asset
     ContractDeploymentService-->>UI: { kind: success, asset }
+  end
+```
+
+## TokenizationService.tokenizeAsset
+
+```mermaid
+sequenceDiagram
+  participant TokenizeAssetAPI as "POST /api/tokenize-asset"
+  participant TokenizationService
+  participant AssetTokenizationRepository
+  participant TokenizationGateway
+
+  TokenizeAssetAPI->>TokenizationService: tokenizeAsset(input)
+  TokenizationService->>AssetTokenizationRepository: getAssetById(assetId)
+  AssetTokenizationRepository-->>TokenizationService: Asset
+  alt asset.tokenAddress already exists
+    TokenizationService-->>TokenizeAssetAPI: existing TokenizationResult
+  else no tokenAddress
+    TokenizationService->>AssetTokenizationRepository: createContractDeploymentRequestIfMissing({ requestId: "contract-deployment:{assetId}", idempotencyKey, latestRunId })
+    alt existing request
+      AssetTokenizationRepository-->>TokenizationService: { request, created: false }
+      alt request.tokenAddress exists
+        TokenizationService-->>TokenizeAssetAPI: existing TokenizationResult
+      else request in progress
+        TokenizationService-->>TokenizeAssetAPI: DomainError("Contract deployment already in progress.")
+      end
+    else request created
+      AssetTokenizationRepository-->>TokenizationService: { request, created: true }
+      TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitting)
+      TokenizationService->>TokenizationGateway: tokenize(payload)
+      TokenizationGateway-->>TokenizationService: deployed contract
+      TokenizationService->>AssetTokenizationRepository: updateAssetTokenization({ assetId, tokenAddress, latestRunId })
+      TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitted)
+      TokenizationService-->>TokenizeAssetAPI: TokenizationResult
+    end
   end
 ```
 
@@ -242,6 +294,40 @@ sequenceDiagram
     MintOwnershipAPI-->>OwnershipMintingService: MintResult
     OwnershipMintingService->>ownershipMinting: getMintOwnershipSuccessMessage(result)
     OwnershipMintingService-->>UI: { kind: success, result, toast }
+  end
+```
+
+## POST /api/mint-ownership
+
+```mermaid
+sequenceDiagram
+  participant UI
+  participant MintOwnershipAPI as "POST /api/mint-ownership"
+  participant InvestmentRepository
+
+  UI->>MintOwnershipAPI: { orderId, walletAddress }
+  MintOwnershipAPI->>InvestmentRepository: getOrderById(orderId)
+  InvestmentRepository-->>MintOwnershipAPI: Order
+  MintOwnershipAPI->>InvestmentRepository: getListingById(order.listingId)
+  InvestmentRepository-->>MintOwnershipAPI: Listing
+  alt order.mintedAt exists
+    MintOwnershipAPI-->>UI: { status: "minted" }
+  else order.mintRequestedAt exists
+    MintOwnershipAPI-->>UI: { status: "pending" }
+  else no mint started
+    MintOwnershipAPI->>InvestmentRepository: createMintRequestIfMissing({ requestId: "mint:{orderId}", orderId, assetId, idempotencyKey, walletAddress, createdAt })
+    alt existing MintRequest
+      InvestmentRepository-->>MintOwnershipAPI: { request, created: false }
+      alt request.mintStatus == minted
+        MintOwnershipAPI-->>UI: { status: "minted" }
+      else
+        MintOwnershipAPI-->>UI: { status: "pending" }
+      end
+    else new MintRequest created
+      InvestmentRepository-->>MintOwnershipAPI: { request, created: true }
+      MintOwnershipAPI->>InvestmentRepository: updateOrder({ mintRequestedAt, investorWalletAddress })
+      MintOwnershipAPI-->>UI: { status: "queued" }
+    end
   end
 ```
 

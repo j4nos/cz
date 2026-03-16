@@ -2,16 +2,56 @@ import { describe, expect, it } from "vitest";
 
 import type { AssetTokenizationRepository, TokenizationGateway } from "@/src/application/interfaces/tokenizationPorts";
 import { TokenizationService } from "@/src/application/use-cases/tokenizationService";
-import type { Asset } from "@/src/domain/entities";
+import type { Asset, ContractDeploymentRequest } from "@/src/domain/entities";
 import { DomainError } from "@/src/domain/value-objects/errors";
 
 class FakeAssetTokenizationRepository implements AssetTokenizationRepository {
   constructor(private readonly asset: Asset | null) {}
 
   updated: { assetId: string; tokenAddress: string; latestRunId: string } | null = null;
+  createdRequest: { requestId: string; assetId: string; idempotencyKey: string; latestRunId: string; tokenStandard?: string } | null = null;
+  updatedRequest: ContractDeploymentRequest | null = null;
 
   async getAssetById(): Promise<Asset | null> {
     return this.asset;
+  }
+
+  async getContractDeploymentRequestById(): Promise<ContractDeploymentRequest | null> {
+    return null;
+  }
+
+  async createContractDeploymentRequestIfMissing(input: {
+    requestId: string;
+    assetId: string;
+    idempotencyKey: string;
+    latestRunId: string;
+    tokenStandard?: string;
+  }): Promise<{ request: ContractDeploymentRequest | null; created: boolean }> {
+    this.createdRequest = input;
+    if (!this.asset || this.asset.tokenAddress) {
+      return { request: null, created: false };
+    }
+
+    return {
+      created: true,
+      request: {
+        id: input.requestId,
+        assetId: input.assetId,
+        idempotencyKey: input.idempotencyKey,
+        deploymentStatus: "queued",
+        runId: input.latestRunId,
+        tokenStandard: input.tokenStandard,
+        createdAt: "2026-03-16T00:00:00.000Z",
+        updatedAt: "2026-03-16T00:00:00.000Z",
+      },
+    };
+  }
+
+  async updateContractDeploymentRequest(
+    request: ContractDeploymentRequest,
+  ): Promise<ContractDeploymentRequest> {
+    this.updatedRequest = request;
+    return request;
   }
 
   async updateAssetTokenization(input: {
@@ -79,6 +119,13 @@ describe("TokenizationService", () => {
       assetId: "asset-1",
       tokenAddress: "0xcontract",
       latestRunId: "run-1",
+    });
+    expect(repository.createdRequest).toEqual({
+      requestId: "contract-deployment:asset-1",
+      assetId: "asset-1",
+      idempotencyKey: "contract-deployment:asset-1",
+      latestRunId: "run-1",
+      tokenStandard: "erc-721",
     });
   });
 

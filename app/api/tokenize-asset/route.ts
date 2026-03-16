@@ -62,6 +62,8 @@ export async function POST(request: Request) {
           ? 404
           : error.message === "Forbidden."
           ? 403
+          : error.message === "Contract deployment already in progress."
+          ? 409
           : error.message === "Invalid owner address."
           ? 400
           : error.message === "RPC or private key missing."

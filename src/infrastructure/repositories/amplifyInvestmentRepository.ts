@@ -4,7 +4,15 @@ import type { Schema } from "@/amplify/data/resource";
 import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
 import type { AssetTokenizationRepository } from "@/src/application/interfaces/tokenizationPorts";
 import type { BlogPost } from "@/src/domain/entities/content";
-import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
+import type {
+  Asset,
+  ContractDeploymentRequest,
+  Listing,
+  MintRequest,
+  Order,
+  Product,
+  UserProfile,
+} from "@/src/domain/entities";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { listAll } from "@/src/infrastructure/amplify/pagination";
 import { normalizeStoredPublicPath } from "@/src/infrastructure/storage/publicUrls";
@@ -129,6 +137,68 @@ export class AmplifyInvestmentRepository
       tokenAddress: input.tokenAddress,
       latestRunId: input.latestRunId,
     });
+  }
+
+  async getContractDeploymentRequestById(id: string): Promise<ContractDeploymentRequest | null> {
+    const response = await this.client.models.ContractDeploymentRequest.get({ id });
+    return response.data ? mapContractDeploymentRequestRecord(response.data) : null;
+  }
+
+  async createContractDeploymentRequestIfMissing(input: {
+    requestId: string;
+    assetId: string;
+    idempotencyKey: string;
+    latestRunId: string;
+    tokenStandard?: string;
+  }): Promise<{ request: ContractDeploymentRequest | null; created: boolean }> {
+    const now = new Date().toISOString();
+    try {
+      const response = await this.client.models.ContractDeploymentRequest.create({
+        id: input.requestId,
+        assetId: input.assetId,
+        idempotencyKey: input.idempotencyKey,
+        deploymentStatus: "queued",
+        runId: input.latestRunId,
+        tokenStandard: input.tokenStandard,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      if (response.data) {
+        return {
+          request: mapContractDeploymentRequestRecord(response.data),
+          created: true,
+        };
+      }
+    } catch {
+      // Duplicate creates can happen under concurrent requests. In that case
+      // we treat the existing request as the idempotent winner.
+    }
+
+    return {
+      request: await this.getContractDeploymentRequestById(input.requestId),
+      created: false,
+    };
+  }
+
+  async updateContractDeploymentRequest(
+    request: ContractDeploymentRequest,
+  ): Promise<ContractDeploymentRequest> {
+    const response = await this.client.models.ContractDeploymentRequest.update({
+      id: request.id,
+      assetId: request.assetId,
+      idempotencyKey: request.idempotencyKey,
+      deploymentStatus: request.deploymentStatus,
+      runId: request.runId,
+      tokenStandard: request.tokenStandard,
+      tokenAddress: request.tokenAddress,
+      errorCode: request.errorCode,
+      errorMessage: request.errorMessage,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+    });
+
+    return response.data ? mapContractDeploymentRequestRecord(response.data) : request;
   }
 
   async createListing(input: Listing): Promise<Listing> {
@@ -256,6 +326,69 @@ export class AmplifyInvestmentRepository
     return first ? mapOrderRecord(first) : null;
   }
 
+  async getMintRequestById(id: string): Promise<MintRequest | null> {
+    const response = await this.client.models.MintRequest.get({ id });
+    return response.data ? mapMintRequestRecord(response.data) : null;
+  }
+
+  async createMintRequestIfMissing(input: {
+    requestId: string;
+    orderId: string;
+    assetId: string;
+    idempotencyKey: string;
+    walletAddress?: string;
+    createdAt: string;
+  }): Promise<{ request: MintRequest | null; created: boolean }> {
+    try {
+      const response = await this.client.models.MintRequest.create({
+        id: input.requestId,
+        orderId: input.orderId,
+        assetId: input.assetId,
+        idempotencyKey: input.idempotencyKey,
+        mintStatus: "queued",
+        walletAddress: input.walletAddress,
+        retryCount: 0,
+        createdAt: input.createdAt,
+        updatedAt: input.createdAt,
+      });
+
+      if (response.data) {
+        return {
+          request: mapMintRequestRecord(response.data),
+          created: true,
+        };
+      }
+    } catch {
+      // Duplicate creates can happen under concurrent requests. In that case
+      // we treat the existing request as the idempotent winner.
+    }
+
+    return {
+      request: await this.getMintRequestById(input.requestId),
+      created: false,
+    };
+  }
+
+  async updateMintRequest(input: MintRequest): Promise<MintRequest> {
+    const response = await this.client.models.MintRequest.update({
+      id: input.id,
+      orderId: input.orderId,
+      assetId: input.assetId,
+      idempotencyKey: input.idempotencyKey,
+      mintStatus: input.mintStatus,
+      walletAddress: input.walletAddress,
+      blockchainTxHash: input.blockchainTxHash,
+      tokenId: input.tokenId,
+      retryCount: input.retryCount,
+      errorCode: input.errorCode,
+      errorMessage: input.errorMessage,
+      createdAt: input.createdAt,
+      updatedAt: input.updatedAt,
+    });
+
+    return response.data ? mapMintRequestRecord(response.data) : input;
+  }
+
   async updateOrder(order: Order): Promise<Order> {
     const response = await this.client.models.Order.update({
       id: order.id,
@@ -264,6 +397,14 @@ export class AmplifyInvestmentRepository
       paymentProviderId: order.paymentProviderId,
       paymentProviderStatus: order.paymentProviderStatus,
       investorWalletAddress: order.investorWalletAddress,
+      mintRequestedAt: order.mintRequestedAt,
+      mintingAt: order.mintingAt,
+      mintTxHash: order.mintTxHash,
+      mintError: order.mintError,
+      mintedAt: order.mintedAt,
+      withdrawnAt: order.withdrawnAt,
+      providerConfirmedAt: order.providerConfirmedAt,
+      providerConfirmedBy: order.providerConfirmedBy,
     });
 
     return response.data ? mapOrderRecord(response.data) : order;
@@ -356,5 +497,66 @@ export class AmplifyInvestmentRepository
 
   async deleteBlogPost(blogId: string): Promise<void> {
     await this.client.models.BlogPost.delete({ id: blogId });
+  }
+}
+
+function mapContractDeploymentRequestRecord(
+  item: Schema["ContractDeploymentRequest"]["type"],
+): ContractDeploymentRequest {
+  return {
+    id: item.id,
+    assetId: item.assetId,
+    idempotencyKey: item.idempotencyKey,
+    deploymentStatus: normalizeContractDeploymentStatus(item.deploymentStatus),
+    runId: item.runId,
+    tokenStandard: item.tokenStandard ?? undefined,
+    tokenAddress: item.tokenAddress ?? undefined,
+    errorCode: item.errorCode ?? undefined,
+    errorMessage: item.errorMessage ?? undefined,
+    createdAt: item.createdAt ?? new Date().toISOString(),
+    updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function mapMintRequestRecord(item: Schema["MintRequest"]["type"]): MintRequest {
+  return {
+    id: item.id,
+    orderId: item.orderId,
+    assetId: item.assetId,
+    idempotencyKey: item.idempotencyKey,
+    mintStatus: normalizeMintRequestStatus(item.mintStatus),
+    walletAddress: item.walletAddress ?? undefined,
+    blockchainTxHash: item.blockchainTxHash ?? undefined,
+    tokenId: item.tokenId ?? undefined,
+    retryCount: item.retryCount ?? 0,
+    errorCode: item.errorCode ?? undefined,
+    errorMessage: item.errorMessage ?? undefined,
+    createdAt: item.createdAt ?? new Date().toISOString(),
+    updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function normalizeContractDeploymentStatus(value: string): ContractDeploymentRequest["deploymentStatus"] {
+  switch (value) {
+    case "queued":
+    case "submitting":
+    case "submitted":
+    case "failed":
+      return value;
+    default:
+      return "failed";
+  }
+}
+
+function normalizeMintRequestStatus(value: string): MintRequest["mintStatus"] {
+  switch (value) {
+    case "queued":
+    case "submitting":
+    case "submitted":
+    case "minted":
+    case "failed":
+      return value;
+    default:
+      return "failed";
   }
 }

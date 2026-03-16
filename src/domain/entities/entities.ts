@@ -17,6 +17,8 @@ export type AssetStatus =
 export type SaleStatus = "draft" | "open" | "closed";
 
 export type OrderStatus = "pending" | "paid" | "cancelled" | "failed";
+export type ContractDeploymentStatus = "queued" | "submitting" | "submitted" | "failed";
+export type MintRequestStatus = "queued" | "submitting" | "submitted" | "minted" | "failed";
 
 export interface UserProfile {
   id: string;
@@ -104,4 +106,34 @@ export interface Order {
   mintTxHash?: string;
   mintError?: string;
   mintedAt?: string;
+}
+
+export interface ContractDeploymentRequest {
+  id: string;
+  assetId: string;
+  idempotencyKey: string;
+  deploymentStatus: ContractDeploymentStatus;
+  runId: string;
+  tokenStandard?: string;
+  tokenAddress?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MintRequest {
+  id: string;
+  orderId: string;
+  assetId: string;
+  idempotencyKey: string;
+  mintStatus: MintRequestStatus;
+  walletAddress?: string;
+  blockchainTxHash?: string;
+  tokenId?: string;
+  retryCount: number;
+  errorCode?: string;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
 }

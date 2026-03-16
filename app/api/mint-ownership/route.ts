@@ -1,17 +1,12 @@
-import { generateClient } from "aws-amplify/data";
 import { ethers } from "ethers";
 import { NextResponse } from "next/server";
 
-import type { Schema } from "@/amplify/data/resource";
+import { OwnershipMintingProcessorService } from "@/src/application/use-cases/ownershipMintingProcessorService";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
+import { EthersOwnershipMintingGateway } from "@/src/infrastructure/gateways/ethersOwnershipMintingGateway";
+import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
 export const runtime = "nodejs";
-
-const getClient = () => {
-  ensureAmplifyConfigured();
-  return generateClient<Schema>();
-};
 
 export async function POST(request: Request) {
   try {
@@ -38,9 +33,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid token." }, { status: 401 });
     }
 
-    const client = getClient();
-    const orderRes = await client.models.Order.get({ id: cleanedOrderId });
-    const order = orderRes.data;
+    const repository = new AmplifyInvestmentRepository();
+    const order = await repository.getOrderById(cleanedOrderId);
     if (!order) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
@@ -81,40 +75,102 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      await client.models.Order.update({
-        id: order.id,
-        investorWalletAddress: resolvedWallet,
-      });
       order.investorWalletAddress = resolvedWallet;
     }
 
-    if (order.mintedAt) {
+    const requestId = `mint:${order.id}`;
+    const existingRequest = await repository.getMintRequestById(requestId);
+
+    if (order.mintedAt || existingRequest?.mintStatus === "minted") {
       return NextResponse.json({
         status: "minted",
-        mintedAt: order.mintedAt,
+        mintedAt: order.mintedAt ?? existingRequest?.updatedAt,
+        txHash: order.mintTxHash ?? existingRequest?.blockchainTxHash,
       });
     }
 
-    if (order.mintRequestedAt) {
+    if (
+      existingRequest &&
+      (existingRequest.mintStatus === "queued" ||
+        existingRequest.mintStatus === "submitting" ||
+        existingRequest.mintStatus === "submitted")
+    ) {
       return NextResponse.json(
         {
           status: "pending",
-          mintRequestedAt: order.mintRequestedAt,
+          mintRequestedAt: order.mintRequestedAt ?? existingRequest.createdAt,
         },
         { status: 202 }
       );
     }
 
+    const listing = await repository.getListingById(order.listingId);
+    if (!listing) {
+      return NextResponse.json({ error: "Listing not found." }, { status: 404 });
+    }
+
+    const asset = await repository.getAssetById(listing.assetId);
+    if (!asset) {
+      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
+    }
+
     const now = new Date().toISOString();
-    await client.models.Order.update({
-      id: order.id,
-      mintRequestedAt: now,
+    const mintRequest = await repository.createMintRequestIfMissing({
+      requestId,
+      orderId: order.id,
+      assetId: listing.assetId,
+      idempotencyKey: requestId,
+      walletAddress: order.investorWalletAddress,
+      createdAt: now,
     });
 
-    return NextResponse.json(
-      { status: "queued", mintRequestedAt: now },
-      { status: 202 }
+    if (!mintRequest.request) {
+      return NextResponse.json(
+        { error: "Mint request could not be created." },
+        { status: 500 }
+      );
+    }
+
+    if (!mintRequest.created) {
+      if (mintRequest.request.mintStatus === "minted") {
+        return NextResponse.json({
+          status: "minted",
+          mintedAt: mintRequest.request.updatedAt,
+          txHash: mintRequest.request.blockchainTxHash,
+        });
+      }
+
+      if (
+        mintRequest.request.mintStatus === "queued" ||
+        mintRequest.request.mintStatus === "submitting" ||
+        mintRequest.request.mintStatus === "submitted"
+      ) {
+        return NextResponse.json(
+          {
+            status: "pending",
+            mintRequestedAt: mintRequest.request.createdAt,
+          },
+          { status: 202 }
+        );
+      }
+    }
+    const processor = new OwnershipMintingProcessorService(
+      repository,
+      new EthersOwnershipMintingGateway(),
     );
+    const result = await processor.process({
+      request: mintRequest.request,
+      order,
+      listing,
+      asset,
+      walletAddress: order.investorWalletAddress,
+    });
+
+    if (result.status === "pending") {
+      return NextResponse.json(result, { status: 202 });
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to mint tokens.";

@@ -1,5 +1,12 @@
 import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
-import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
+import type {
+  Asset,
+  Listing,
+  MintRequest,
+  Order,
+  Product,
+  UserProfile,
+} from "@/src/domain/entities";
 
 export class InMemoryInvestmentRepository implements InvestmentRepository {
   private readonly userProfiles = new Map<string, UserProfile>();
@@ -7,6 +14,7 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
   private readonly listings = new Map<string, Listing>();
   private readonly products = new Map<string, Product>();
   private readonly orders = new Map<string, Order>();
+  private readonly mintRequests = new Map<string, MintRequest>();
 
   async createUserProfile(input: UserProfile): Promise<UserProfile> {
     this.userProfiles.set(input.id, { ...input });
@@ -88,6 +96,43 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
     }
 
     return null;
+  }
+
+  async getMintRequestById(id: string): Promise<MintRequest | null> {
+    return this.copyOrNull(this.mintRequests.get(id));
+  }
+
+  async createMintRequestIfMissing(input: {
+    requestId: string;
+    orderId: string;
+    assetId: string;
+    idempotencyKey: string;
+    walletAddress?: string;
+    createdAt: string;
+  }): Promise<{ request: MintRequest | null; created: boolean }> {
+    const existing = this.mintRequests.get(input.requestId);
+    if (existing) {
+      return { request: { ...existing }, created: false };
+    }
+
+    const request: MintRequest = {
+      id: input.requestId,
+      orderId: input.orderId,
+      assetId: input.assetId,
+      idempotencyKey: input.idempotencyKey,
+      mintStatus: "queued",
+      walletAddress: input.walletAddress,
+      retryCount: 0,
+      createdAt: input.createdAt,
+      updatedAt: input.createdAt,
+    };
+    this.mintRequests.set(input.requestId, request);
+    return { request: { ...request }, created: true };
+  }
+
+  async updateMintRequest(input: MintRequest): Promise<MintRequest> {
+    this.mintRequests.set(input.id, { ...input });
+    return { ...input };
   }
 
   async updateOrder(order: Order): Promise<Order> {
