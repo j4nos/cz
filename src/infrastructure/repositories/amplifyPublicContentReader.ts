@@ -1,10 +1,20 @@
 import type { BlogPost } from "@/src/domain/entities/content";
 import type { Product } from "@/src/domain/entities";
 import type { PublicContentReader, PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
+
+type PublicContentRepository = {
+  listListings(): Promise<PublicListingWithAsset["listing"][]>;
+  listAssets(): Promise<Array<NonNullable<PublicListingWithAsset["asset"]>>>;
+  getListingById(listingId: string): Promise<PublicListingWithAsset["listing"] | null>;
+  getAssetById(assetId: string): Promise<PublicListingWithAsset["asset"]>;
+  listProductsByListingId(listingId: string): Promise<Product[]>;
+  getProductById(productId: string): Promise<Product | null>;
+  getOrderById(orderId: string): Promise<Awaited<ReturnType<PublicContentReader["getOrderById"]>>>;
+  listPublishedBlogPosts(): Promise<BlogPost[]>;
+};
 
 export class AmplifyPublicContentReader implements PublicContentReader {
-  constructor(private readonly repository: AmplifyInvestmentRepository = new AmplifyInvestmentRepository()) {}
+  constructor(private readonly repository: PublicContentRepository) {}
 
   async listOpenListingsWithAssets(): Promise<PublicListingWithAsset[]> {
     const [listings, assets] = await Promise.all([this.repository.listListings(), this.repository.listAssets()]);

@@ -4,13 +4,14 @@ import erc20Artifact from "@/artifacts/contracts/AssetToken20.sol/AssetToken20.j
 import erc721Artifact from "@/artifacts/contracts/AssetToken721.sol/AssetToken721.json";
 import type { OwnershipMintingGateway } from "@/src/application/use-cases/ownershipMintingProcessorService";
 import { DomainError } from "@/src/domain/value-objects/errors";
+import { normalizeTokenStandard } from "@/src/domain/value-objects/tokenStandard";
 
 function getMintingEnv() {
   const rpcUrl = process.env.POLYGON_RPC_URL?.trim() || process.env.RPC_URL?.trim() || "";
   const privateKey = process.env.PRIVATE_KEY?.trim() || "";
 
   if (!rpcUrl || !privateKey) {
-    throw new Error("RPC or private key missing.");
+    throw new DomainError({ code: "RPC_CONFIG_MISSING" });
   }
 
   return { rpcUrl, privateKey };
@@ -24,20 +25,17 @@ export class EthersOwnershipMintingGateway implements OwnershipMintingGateway {
     tokenStandard?: string;
   }): Promise<{ txHash: string; tokenId?: string }> {
     if (!ethers.isAddress(input.tokenAddress)) {
-      throw new DomainError("Invalid token address.");
+      throw new DomainError({ code: "INVALID_TOKEN_ADDRESS" });
     }
 
     if (!ethers.isAddress(input.to)) {
-      throw new DomainError("Invalid investor wallet address.");
+      throw new DomainError({ code: "INVALID_INVESTOR_WALLET_ADDRESS" });
     }
 
     const { rpcUrl, privateKey } = getMintingEnv();
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const wallet = new ethers.Wallet(privateKey, provider);
-    const standard =
-      input.tokenStandard === "erc-721" || input.tokenStandard === "erc721" || input.tokenStandard === "ERC-721"
-        ? "erc-721"
-        : "erc-20";
+    const standard = normalizeTokenStandard(input.tokenStandard);
 
     if (standard === "erc-721") {
       const contract = new ethers.Contract(

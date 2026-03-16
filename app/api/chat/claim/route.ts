@@ -112,12 +112,12 @@ export async function POST(request: Request) {
 
     const client = getClient();
 
-    const threads = await listAll<Schema["UserThread"]["type"], { nextToken?: string }>(
-      (args) =>
+    const threads = await listAll<Schema["UserThread"]["type"]>(
+      (nextToken) =>
         client.models.UserThread.list({
           filter: { userId: { eq: fromUserId } },
-          ...(args ?? {}),
-        })
+          ...(nextToken ? { nextToken } : {}),
+        }),
     );
     await updateInBatches(threads, 25, async (thread) => {
       await client.models.UserThread.update({
@@ -129,12 +129,12 @@ export async function POST(request: Request) {
       });
     });
 
-    const messages = await listAll<Schema["UserMessage"]["type"], { nextToken?: string }>(
-      (args) =>
+    const messages = await listAll<Schema["UserMessage"]["type"]>(
+      (nextToken) =>
         client.models.UserMessage.list({
           filter: { userId: { eq: fromUserId } },
-          ...(args ?? {}),
-        })
+          ...(nextToken ? { nextToken } : {}),
+        }),
     );
     await updateInBatches(messages, 25, async (message) => {
       await client.models.UserMessage.update({

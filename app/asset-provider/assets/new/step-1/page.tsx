@@ -1,59 +1,55 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
 export default function AssetWizardStep1Page() {
   const router = useRouter();
-  const { activeUser } = useAuth();
+  const { activeUser, accessToken } = useAuth();
   const { setToast } = useToast();
   const { state, updateState } = useAssetWizard();
-  const repository = useMemo(() => new AmplifyInvestmentRepository(), []);
 
   if (!activeUser) {
     return <p className="muted">Login to create an asset.</p>;
   }
 
-  const activeUserId = activeUser.uid;
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const assetId = state.assetId || crypto.randomUUID();
 
     try {
-      const existing = state.assetId
-        ? await repository.getAssetById(state.assetId)
-        : null;
+      if (!accessToken) {
+        setToast("Login required to save asset basics.", "danger", 2500);
+        return;
+      }
 
-      if (existing) {
-        await repository.updateAsset({
-          ...existing,
-          name: state.name,
-          country: state.country,
-          assetClass: state.assetClass,
-          tokenStandard: state.tokenStandard,
-        });
-      } else {
-        await repository.createAsset({
-          id: assetId,
-          tenantUserId: activeUserId,
+      const response = await fetch("/api/assets/draft", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          assetId: state.assetId,
           name: state.name,
           country: state.country || "France",
           assetClass: state.assetClass,
           tokenStandard: state.tokenStandard,
-          status: "draft",
-          missingDocsCount: 0,
-          imageUrls: [],
-        });
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        asset?: { id: string };
+        error?: string;
+      };
+
+      if (!response.ok || !result.asset) {
+        throw new Error(result.error || "Failed to save asset basics.");
       }
 
-      updateState({ assetId });
+      updateState({ assetId: result.asset.id });
       router.push("/asset-provider/assets/new/step-2");
     } catch (error) {
       console.error("[asset-step-1] save failed", error);

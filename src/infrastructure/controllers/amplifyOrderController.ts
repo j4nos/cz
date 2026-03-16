@@ -3,23 +3,17 @@
 import type { OrderPort } from "@/src/application/interfaces/orderPort";
 import { InvestmentPlatformService } from "@/src/application/use-cases/investmentPlatformService";
 import type { Order } from "@/src/domain/entities";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
-class AmplifyIdGenerator {
-  next(): string {
-    return `id-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  }
-}
-
-class AmplifyClock {
-  now(): string {
-    return new Date().toISOString();
-  }
-}
+type OrderRepository = {
+  getOrderById(orderId: string): Promise<Order | null>;
+  updateOrder(order: Order): Promise<Order>;
+};
 
 export class AmplifyOrderController implements OrderPort {
-  private readonly repository = new AmplifyInvestmentRepository();
-  private readonly service = new InvestmentPlatformService(this.repository, new AmplifyIdGenerator(), new AmplifyClock());
+  constructor(
+    private readonly repository: OrderRepository,
+    private readonly service: Pick<InvestmentPlatformService, "startOrder" | "completeOrderPayment">,
+  ) {}
 
   async placeOrder(input: {
     investorId: string;

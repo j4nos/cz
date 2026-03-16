@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import styles from "./Card.module.css";
 
 type CardProps = {
@@ -19,7 +21,7 @@ export function Card({ title, body, cta, imageSrc }: CardProps) {
       {hasMedia ? (
         <>
           <div className={styles.mediaImageWrap}>
-            <img alt={titleText} className={styles.mediaImage} src={imageSrc} />
+            <Image alt={titleText} className={styles.mediaImage} src={imageSrc!} width={370} height={370} />
           </div>
           <div className={styles.mediaContent}>
             <h3 className={styles.title}>{titleText}</h3>

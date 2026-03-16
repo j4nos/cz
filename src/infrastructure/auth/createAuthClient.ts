@@ -1,8 +1,8 @@
 "use client";
 
 import type { AuthClient } from "@/src/application/interfaces/authClient";
-import { createAmplifyAuthClient } from "@/src/infrastructure/auth/amplifyAuthClient";
+import { getAmplifyAuthClient } from "@/src/infrastructure/composition/defaults";
 
 export function createAuthClient(): AuthClient {
-  return createAmplifyAuthClient();
+  return getAmplifyAuthClient();
 }

@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import { generateClient } from "aws-amplify/data";
 
 import type { Schema } from "@/amplify/data/resource";
-import { PowensPaymentSyncService } from "@/src/application/use-cases/powensPaymentSyncService";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
 import { getPowensEnv } from "@/src/config/powensEnv";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
+import { createPowensPaymentSyncService } from "@/src/infrastructure/composition/defaults";
 
 export const runtime = "nodejs";
 
@@ -121,7 +120,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const service = new PowensPaymentSyncService(new AmplifyInvestmentRepository());
+    const service = createPowensPaymentSyncService();
     const syncedOrder = await service.syncByOrderId({
       orderId: order.id,
       paymentState: paymentData.state,

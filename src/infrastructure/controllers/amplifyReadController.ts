@@ -1,10 +1,23 @@
 "use client";
 
 import type { ReadPort } from "@/src/application/interfaces/readPort";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
+
+type ReadRepository = Pick<
+  ReadPort,
+  | "getAssetById"
+  | "getListingById"
+  | "getOrderById"
+  | "listProductsByListingId"
+  | "getProductById"
+  | "listOrdersByInvestor"
+  | "listOrdersByProvider"
+> & {
+  listAssets(): ReturnType<ReadPort["listAssets"]>;
+  listListings(): Promise<Array<{ assetId: string } & Awaited<ReturnType<ReadPort["getListingById"]>> extends infer T ? T extends { id: string } ? T : never : never>>;
+};
 
 export class AmplifyReadController implements ReadPort {
-  constructor(private readonly repository: AmplifyInvestmentRepository = new AmplifyInvestmentRepository()) {}
+  constructor(private readonly repository: ReadRepository) {}
 
   async listAssets() {
     return this.repository.listAssets();

@@ -3,23 +3,20 @@
 import type { ListingPort } from "@/src/application/interfaces/listingPort";
 import { InvestmentPlatformService } from "@/src/application/use-cases/investmentPlatformService";
 import type { Listing } from "@/src/domain/entities";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
-class AmplifyIdGenerator {
-  next(): string {
-    return `id-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  }
-}
-
-class AmplifyClock {
-  now(): string {
-    return new Date().toISOString();
-  }
-}
+type ListingRepository = {
+  updateListing(listing: Listing): Promise<Listing>;
+  getListingById(listingId: string): Promise<Listing | null>;
+  createListing(listing: Listing): Promise<Listing>;
+  deleteListing(listingId: string): Promise<void>;
+  deleteProduct(productId: string): Promise<void>;
+};
 
 export class AmplifyListingController implements ListingPort {
-  private readonly repository = new AmplifyInvestmentRepository();
-  private readonly service = new InvestmentPlatformService(this.repository, new AmplifyIdGenerator(), new AmplifyClock());
+  constructor(
+    private readonly repository: ListingRepository,
+    private readonly service: Pick<InvestmentPlatformService, "createListing">,
+  ) {}
 
   async createListingDraft(input: {
     assetId: string;

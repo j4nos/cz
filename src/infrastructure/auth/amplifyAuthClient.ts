@@ -17,7 +17,12 @@ import {
 import type { AuthClient, AuthUser } from "@/src/application/interfaces/authClient";
 import type { UserProfile } from "@/src/domain/entities";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
+
+type UserProfileRepository = {
+  getUserProfileById(id: string): Promise<UserProfile | null>;
+  updateUserProfile(input: UserProfile): Promise<UserProfile>;
+  createUserProfile(input: UserProfile): Promise<UserProfile>;
+};
 
 const listeners = new Set<(user: AuthUser | null) => void>();
 
@@ -83,8 +88,7 @@ async function notify() {
   });
 }
 
-export function createAmplifyAuthClient(): AuthClient {
-  const repository = new AmplifyInvestmentRepository();
+export function createAmplifyAuthClient(repository: UserProfileRepository): AuthClient {
   let cachedUser: AuthUser | null = null;
 
   return {

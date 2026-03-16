@@ -200,7 +200,6 @@ export default function InvestorPortfolioPage() {
               ? {
                   ...item,
                   investorWalletAddress: walletAddress.trim(),
-                  withdrawnAt: new Date().toISOString(),
                   mintRequestedAt: nextMintRequestedAt ?? item.mintRequestedAt,
                   mintedAt: nextMintedAt ?? item.mintedAt,
                 }

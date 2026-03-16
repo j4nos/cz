@@ -316,7 +316,7 @@ sequenceDiagram
     MintOwnershipAPI-->>UI: queued
     DynamoDB-->>Stream: INSERT event
     Stream-->>Worker: MintRequest inserted
-    Worker->>DynamoDB: conditional update queued -> submitting
+    Worker->>DynamoDB: UpdateItem(condition: mintStatus in [queued, failed], set submitting)
     Worker->>Chain: contract.mint(...)
     Chain-->>Worker: tx / receipt
     Worker->>DynamoDB: update MintRequest(submitted or minted)
@@ -344,7 +344,7 @@ sequenceDiagram
     TokenizeAssetAPI-->>UI: queued
     DynamoDB-->>Stream: INSERT event
     Stream-->>Worker: ContractDeploymentRequest inserted
-    Worker->>DynamoDB: conditional update queued -> submitting
+    Worker->>DynamoDB: UpdateItem(condition: deploymentStatus in [queued, failed], set submitting)
     Worker->>Chain: factory.deploy(...)
     Chain-->>Worker: deployed contract
     Worker->>DynamoDB: update ContractDeploymentRequest(submitted, tokenAddress)

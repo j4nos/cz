@@ -2,8 +2,10 @@ import type {
   AssetTokenizationRepository,
   TokenizationGateway,
 } from "@/src/application/interfaces/tokenizationPorts";
+import type { RequestClaimPort } from "@/src/application/interfaces/requestClaimPort";
 import { DomainError } from "@/src/domain/value-objects/errors";
 import type { TokenizationResult } from "@/src/domain/entities/tokenization";
+import { normalizeTokenStandard } from "@/src/domain/value-objects/tokenStandard";
 
 export interface TokenizationIdGenerator {
   next(): string;
@@ -14,6 +16,7 @@ export class TokenizationService {
     private readonly repository: AssetTokenizationRepository,
     private readonly gateway: TokenizationGateway,
     private readonly idGenerator: TokenizationIdGenerator,
+    private readonly requestClaimPort: RequestClaimPort,
   ) {}
 
   async tokenizeAsset(input: {
@@ -26,15 +29,15 @@ export class TokenizationService {
   }): Promise<TokenizationResult> {
     const asset = await this.repository.getAssetById(input.assetId);
     if (!asset) {
-      throw new DomainError("Asset not found.");
+      throw new DomainError({ code: "ASSET_NOT_FOUND" });
     }
 
     if (asset.tenantUserId !== input.userId) {
-      throw new DomainError("Forbidden.");
+      throw new DomainError({ code: "FORBIDDEN" });
     }
 
     if (asset.tokenAddress) {
-      const standard = (input.tokenStandard?.trim() || asset.tokenStandard || "ERC-20").toLowerCase();
+      const standard = normalizeTokenStandard(input.tokenStandard?.trim() || asset.tokenStandard);
       return {
         assetId: input.assetId,
         address: asset.tokenAddress,
@@ -56,12 +59,9 @@ export class TokenizationService {
 
     if (!created.created) {
       if (created.request?.tokenAddress) {
-        const standard = (
-          input.tokenStandard?.trim() ||
-          created.request.tokenStandard ||
-          asset.tokenStandard ||
-          "ERC-20"
-        ).toLowerCase();
+        const standard = normalizeTokenStandard(
+          input.tokenStandard?.trim() || created.request.tokenStandard || asset.tokenStandard,
+        );
         return {
           assetId: input.assetId,
           address: created.request.tokenAddress,
@@ -73,7 +73,7 @@ export class TokenizationService {
 
       const latestAsset = await this.repository.getAssetById(input.assetId);
       if (latestAsset?.tokenAddress && created.request) {
-        const standard = (input.tokenStandard?.trim() || latestAsset.tokenStandard || "ERC-20").toLowerCase();
+        const standard = normalizeTokenStandard(input.tokenStandard?.trim() || latestAsset.tokenStandard);
         return {
           assetId: input.assetId,
           address: latestAsset.tokenAddress,
@@ -83,21 +83,56 @@ export class TokenizationService {
         };
       }
 
-      throw new DomainError("Contract deployment already in progress.");
+      throw new DomainError({ code: "CONTRACT_DEPLOYMENT_IN_PROGRESS" });
     }
 
     const request = created.request;
     if (!request) {
-      throw new DomainError("Contract deployment request could not be created.");
+      throw new DomainError({ code: "CONTRACT_DEPLOYMENT_REQUEST_FAILED" });
+    }
+
+    const submittingAt = new Date().toISOString();
+    const claimed = await this.requestClaimPort.claimContractDeploymentRequest({
+      requestId,
+      claimedAt: submittingAt,
+    });
+
+    if (!claimed) {
+      const currentRequest = await this.repository.getContractDeploymentRequestById(requestId);
+      const latestAsset = await this.repository.getAssetById(input.assetId);
+      if (currentRequest?.tokenAddress) {
+        const standard = normalizeTokenStandard(
+          input.tokenStandard?.trim() ||
+            currentRequest.tokenStandard ||
+            latestAsset?.tokenStandard ||
+            asset.tokenStandard,
+        );
+        return {
+          assetId: input.assetId,
+          address: currentRequest.tokenAddress,
+          standard,
+          supportsErc721: standard === "erc-721",
+          runId: currentRequest.runId,
+        };
+      }
+
+      if (latestAsset?.tokenAddress) {
+        const standard = normalizeTokenStandard(
+          input.tokenStandard?.trim() || latestAsset.tokenStandard || asset.tokenStandard,
+        );
+        return {
+          assetId: input.assetId,
+          address: latestAsset.tokenAddress,
+          standard,
+          supportsErc721: standard === "erc-721",
+          runId: currentRequest?.runId ?? latestAsset.latestRunId ?? runId,
+        };
+      }
+
+      throw new DomainError({ code: "CONTRACT_DEPLOYMENT_IN_PROGRESS" });
     }
 
     try {
-      await this.repository.updateContractDeploymentRequest({
-        ...request,
-        deploymentStatus: "submitting",
-        updatedAt: new Date().toISOString(),
-      });
-
       const deployed = await this.gateway.tokenize({
         assetId: input.assetId,
         name: input.name?.trim() || asset.name,

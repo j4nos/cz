@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { RequestClaimPort } from "@/src/application/interfaces/requestClaimPort";
 import type { AssetTokenizationRepository, TokenizationGateway } from "@/src/application/interfaces/tokenizationPorts";
 import { TokenizationService } from "@/src/application/use-cases/tokenizationService";
 import type { Asset, ContractDeploymentRequest } from "@/src/domain/entities";
@@ -88,6 +89,16 @@ class FixedRunIdGenerator {
   }
 }
 
+class FakeRequestClaimPort implements RequestClaimPort {
+  async claimContractDeploymentRequest(): Promise<boolean> {
+    return true;
+  }
+
+  async claimMintRequest(): Promise<boolean> {
+    return true;
+  }
+}
+
 describe("TokenizationService", () => {
   it("tokenizes an owned asset and stores the token address", async () => {
     const repository = new FakeAssetTokenizationRepository({
@@ -105,6 +116,7 @@ describe("TokenizationService", () => {
       repository,
       new FakeTokenizationGateway(),
       new FixedRunIdGenerator(),
+      new FakeRequestClaimPort(),
     );
 
     const result = await service.tokenizeAsset({
@@ -144,6 +156,7 @@ describe("TokenizationService", () => {
       repository,
       new FakeTokenizationGateway(),
       new FixedRunIdGenerator(),
+      new FakeRequestClaimPort(),
     );
 
     await expect(

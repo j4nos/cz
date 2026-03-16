@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { gunzipSync } from "zlib";
 
-import { PowensPaymentSyncService } from "@/src/application/use-cases/powensPaymentSyncService";
 import { getPowensWebhookSecret } from "@/src/config/powensEnv";
 import { getNodeEnv } from "@/src/config/runtimeEnv";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
+import { createPowensPaymentSyncService } from "@/src/infrastructure/composition/defaults";
 
 export const runtime = "nodejs";
 
@@ -91,7 +90,7 @@ export async function POST(request: Request) {
     }
 
     const paymentId = String(payload.id);
-    const service = new PowensPaymentSyncService(new AmplifyInvestmentRepository());
+    const service = createPowensPaymentSyncService();
     const order = await service.syncByPaymentProviderId({
       paymentProviderId: paymentId,
       paymentState: payload.state,

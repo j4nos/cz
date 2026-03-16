@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import { Badge } from "@/components/ui/Badge";
 import { AppLink } from "@/components/ui/AppLink";
 import styles from "./Hero.module.css";
@@ -27,10 +29,13 @@ export function Hero() {
         </div>
       </div>
       <div className={styles.imageWrap}>
-        <img
+        <Image
           src={DEFAULT_IMAGE}
           alt="Real estate building"
           className={styles.image}
+          width={1200}
+          height={900}
+          priority
         />
       </div>
     </section>

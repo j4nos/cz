@@ -8,9 +8,8 @@ import { KeyValueList } from "@/components/ui/KeyValueList";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
-import { ContractDeploymentService } from "@/src/application/use-cases/contractDeploymentService";
 import type { Asset } from "@/src/domain/entities";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
+import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 
 export default function AssetWizardStep4Page() {
   return (
@@ -26,46 +25,7 @@ function Step4Content() {
   const { activeUser, accessToken } = useAuth();
   const { setToast } = useToast();
   const { state, updateState, resetState } = useAssetWizard();
-  const repository = useMemo(() => new AmplifyInvestmentRepository(), []);
-  const contractDeploymentService = useMemo(
-    () =>
-      new ContractDeploymentService(
-        repository,
-        async ({ assetId, userId, name, tokenStandard, accessToken: currentAccessToken }) => {
-          const response = await fetch("/api/tokenize-asset", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${currentAccessToken}`,
-            },
-            body: JSON.stringify(
-              {
-                assetId,
-                userId,
-                name,
-                tokenStandard,
-              },
-            ),
-          });
-
-          if (!response.ok) {
-            let errorMessage = "Token deployment failed. Please try again.";
-            try {
-              const data = (await response.json()) as { error?: string };
-              if (data?.error) {
-                errorMessage = data.error;
-              }
-            } catch {
-              // Ignore JSON parse failures and use fallback message.
-            }
-            throw new Error(errorMessage);
-          }
-
-          return (await response.json()) as { address: string };
-        },
-      ),
-    [repository],
-  );
+  const readController = useMemo(() => createReadController(), []);
   const assetId = searchParams.get("assetId");
   const effectiveAssetId = assetId || state.assetId;
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -78,19 +38,22 @@ function Step4Content() {
         return;
       }
 
-      const loaded = await contractDeploymentService.loadAssetReview(
-        effectiveAssetId,
-        state.tokenStandard,
-      );
-      setAsset(loaded.asset);
+      const loadedAsset = await readController.getAssetById(effectiveAssetId);
+      setAsset(loadedAsset);
 
-      if (loaded.wizardPatch) {
-        updateState(loaded.wizardPatch);
+      if (loadedAsset) {
+        updateState({
+          assetId: loadedAsset.id,
+          name: loadedAsset.name,
+          country: loadedAsset.country,
+          assetClass: loadedAsset.assetClass,
+          tokenStandard: loadedAsset.tokenStandard ?? state.tokenStandard ?? "ERC-20",
+        });
       }
     }
 
     void load();
-  }, [contractDeploymentService, effectiveAssetId, state.tokenStandard, updateState]);
+  }, [effectiveAssetId, readController, state.tokenStandard, updateState]);
 
   if (!effectiveAssetId) {
     return (
@@ -106,27 +69,36 @@ function Step4Content() {
     setSubmitting(true);
 
     try {
-      const result = await contractDeploymentService.submit({
-        assetId: effectiveAssetId || undefined,
-        activeUserId: activeUser?.uid,
-        accessToken,
-        wizardState: {
+      if (!accessToken) {
+        setToast("Login required to deploy contract.", "danger", 2500);
+        return;
+      }
+
+      const response = await fetch("/api/assets/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          assetId: effectiveAssetId,
           name: state.name,
           country: state.country,
           assetClass: state.assetClass,
           tokenStandard: state.tokenStandard,
-        },
-        asset,
+        }),
       });
-
-      if (result.kind === "error") {
-        setToast(result.message, result.tone, 2500);
-        return;
+      const result = (await response.json().catch(() => ({}))) as {
+        asset?: Asset;
+        error?: string;
+      };
+      if (!response.ok || !result.asset) {
+        throw new Error(result.error || "Failed to submit asset.");
       }
 
       setAsset(result.asset);
       resetState();
-      setToast(result.message, "success", 2500);
+      setToast("Asset submitted with contract.", "success", 2500);
       router.push(`/asset-provider/assets/${result.asset.id}`);
     } catch (error) {
       const message =

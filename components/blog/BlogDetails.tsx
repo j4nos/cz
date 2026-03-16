@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import type { BlogPost } from "@/src/domain/entities/content";
 import styles from "./BlogDetails.module.css";
 
@@ -35,7 +37,7 @@ export function BlogDetails({ post }: BlogDetailsProps) {
         <h1>{post.title}</h1>
       </header>
       {post.coverImage ? (
-        <img src={post.coverImage} alt={post.title} className={styles.cover} />
+        <Image src={post.coverImage} alt={post.title} className={styles.cover} width={1600} height={900} />
       ) : null}
       <div
         className={styles.content}

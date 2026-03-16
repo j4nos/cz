@@ -2,14 +2,22 @@
 
 import type { PricingPort } from "@/src/application/interfaces/pricingPort";
 import { createDefaultPricingState, type ProductPricingState } from "@/src/application/dto/pricingState";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
+import type { Product } from "@/src/domain/entities";
+
+type PricingRepository = {
+  getProductById(productId: string): Promise<Product | null>;
+  listProductsByListingId(listingId: string): Promise<Product[]>;
+  updateProduct(product: Product): Promise<Product>;
+  createProduct(product: Product): Promise<Product>;
+  deleteProduct(productId: string): Promise<void>;
+};
 
 function nextProductId(listingId: string) {
   return `product-${listingId}-${Date.now()}`;
 }
 
 export class AmplifyPricingController implements PricingPort {
-  constructor(private readonly repository: AmplifyInvestmentRepository = new AmplifyInvestmentRepository()) {}
+  constructor(private readonly repository: PricingRepository) {}
 
   async loadPricingState(
     listingId: string,
@@ -25,7 +33,7 @@ export class AmplifyPricingController implements PricingPort {
     const existingProduct = state.productId ? await this.repository.getProductById(state.productId) : null;
 
     if (existingProduct) {
-      const updated = await this.repository.updateProduct({
+      await this.repository.updateProduct({
         ...existingProduct,
         name: state.name,
         currency: state.currency,

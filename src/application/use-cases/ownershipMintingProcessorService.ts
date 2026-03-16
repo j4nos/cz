@@ -1,5 +1,11 @@
 import type { Asset, Listing, MintRequest, Order } from "@/src/domain/entities";
+import type { RequestClaimPort } from "@/src/application/interfaces/requestClaimPort";
 import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
+
+type MintingRepository = Pick<
+  InvestmentRepository,
+  "getMintRequestById" | "updateOrder" | "updateMintRequest"
+>;
 
 export interface OwnershipMintingGateway {
   mint(input: {
@@ -12,8 +18,9 @@ export interface OwnershipMintingGateway {
 
 export class OwnershipMintingProcessorService {
   constructor(
-    private readonly repository: InvestmentRepository,
+    private readonly repository: MintingRepository,
     private readonly gateway: OwnershipMintingGateway,
+    private readonly requestClaimPort: RequestClaimPort,
   ) {}
 
   async process(input: {
@@ -45,14 +52,32 @@ export class OwnershipMintingProcessorService {
     }
 
     const submittingAt = new Date().toISOString();
-    const updatedRequest = await this.repository.updateMintRequest({
-      ...request,
-      mintStatus: "submitting",
-      walletAddress,
-      errorCode: undefined,
-      errorMessage: undefined,
-      updatedAt: submittingAt,
+    const claimed = await this.requestClaimPort.claimMintRequest({
+      requestId: request.id,
+      claimedAt: submittingAt,
     });
+
+    if (!claimed) {
+      const currentRequest = await this.repository.getMintRequestById(request.id);
+      if (currentRequest?.mintStatus === "minted") {
+        return {
+          status: "minted",
+          mintRequestedAt: order.mintRequestedAt ?? currentRequest.createdAt,
+          mintedAt: order.mintedAt ?? currentRequest.updatedAt,
+          txHash: order.mintTxHash ?? currentRequest.blockchainTxHash ?? "",
+        };
+      }
+
+      return {
+        status: "pending",
+        mintRequestedAt: order.mintRequestedAt ?? currentRequest?.createdAt ?? request.createdAt,
+      };
+    }
+
+    const updatedRequest = await this.repository.getMintRequestById(request.id);
+    if (!updatedRequest) {
+      throw new Error("Mint request not found after claim.");
+    }
 
     await this.repository.updateOrder({
       ...order,
@@ -97,7 +122,6 @@ export class OwnershipMintingProcessorService {
         mintTxHash: minted.txHash,
         mintError: undefined,
         mintedAt,
-        withdrawnAt: mintedAt,
       });
 
       return {

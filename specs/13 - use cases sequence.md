@@ -229,6 +229,7 @@ sequenceDiagram
   participant TokenizeAssetAPI as "POST /api/tokenize-asset"
   participant TokenizationService
   participant AssetTokenizationRepository
+  participant RequestClaimPort as "DynamoDbRequestClaimGateway"
   participant TokenizationGateway
 
   TokenizeAssetAPI->>TokenizationService: tokenizeAsset(input)
@@ -247,12 +248,19 @@ sequenceDiagram
       end
     else request created
       AssetTokenizationRepository-->>TokenizationService: { request, created: true }
-      TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitting)
-      TokenizationService->>TokenizationGateway: tokenize(payload)
-      TokenizationGateway-->>TokenizationService: deployed contract
-      TokenizationService->>AssetTokenizationRepository: updateAssetTokenization({ assetId, tokenAddress, latestRunId })
-      TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitted)
-      TokenizationService-->>TokenizeAssetAPI: TokenizationResult
+      TokenizationService->>RequestClaimPort: claimContractDeploymentRequest({ requestId, claimedAt })
+      alt claim succeeded
+        RequestClaimPort-->>TokenizationService: true
+        TokenizationService->>TokenizationGateway: tokenize(payload)
+        TokenizationGateway-->>TokenizationService: deployed contract
+        TokenizationService->>AssetTokenizationRepository: updateAssetTokenization({ assetId, tokenAddress, latestRunId })
+        TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitted)
+        TokenizationService-->>TokenizeAssetAPI: TokenizationResult
+      else claim rejected
+        RequestClaimPort-->>TokenizationService: false
+        TokenizationService->>AssetTokenizationRepository: getContractDeploymentRequestById(requestId)
+        TokenizationService-->>TokenizeAssetAPI: DomainError("Contract deployment already in progress.")
+      end
     end
   end
 ```
@@ -304,6 +312,8 @@ sequenceDiagram
   participant UI
   participant MintOwnershipAPI as "POST /api/mint-ownership"
   participant InvestmentRepository
+  participant RequestClaimPort as "DynamoDbRequestClaimGateway"
+  participant OwnershipMintingProcessorService
 
   UI->>MintOwnershipAPI: { orderId, walletAddress }
   MintOwnershipAPI->>InvestmentRepository: getOrderById(orderId)
@@ -325,8 +335,18 @@ sequenceDiagram
       end
     else new MintRequest created
       InvestmentRepository-->>MintOwnershipAPI: { request, created: true }
-      MintOwnershipAPI->>InvestmentRepository: updateOrder({ mintRequestedAt, investorWalletAddress })
-      MintOwnershipAPI-->>UI: { status: "queued" }
+      MintOwnershipAPI->>OwnershipMintingProcessorService: process({ request, order, listing, asset, walletAddress })
+      OwnershipMintingProcessorService->>RequestClaimPort: claimMintRequest({ requestId, claimedAt })
+      alt claim succeeded
+        RequestClaimPort-->>OwnershipMintingProcessorService: true
+        OwnershipMintingProcessorService->>InvestmentRepository: updateOrder({ mintRequestedAt, mintingAt, investorWalletAddress })
+        OwnershipMintingProcessorService-->>MintOwnershipAPI: { status: "minted" | "pending" }
+        MintOwnershipAPI-->>UI: minted or pending
+      else claim rejected
+        RequestClaimPort-->>OwnershipMintingProcessorService: false
+        OwnershipMintingProcessorService->>InvestmentRepository: getMintRequestById(requestId)
+        MintOwnershipAPI-->>UI: pending or minted
+      end
     end
   end
 ```

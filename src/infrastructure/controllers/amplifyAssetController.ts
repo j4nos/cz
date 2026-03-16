@@ -3,23 +3,33 @@
 import type { AssetPort } from "@/src/application/interfaces/assetPort";
 import { InvestmentPlatformService } from "@/src/application/use-cases/investmentPlatformService";
 import type { Asset } from "@/src/domain/entities";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
 
-class AmplifyIdGenerator {
-  next(): string {
-    return `id-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  }
-}
-
-class AmplifyClock {
-  now(): string {
-    return new Date().toISOString();
-  }
-}
+type AssetRepository = {
+  getUserProfileById(userId: string): Promise<Awaited<ReturnType<InvestmentPlatformService["registerUserProfile"]>> | null>;
+  createUserProfile(input: {
+    id: string;
+    email: string;
+    role: "ASSET_PROVIDER";
+    country: string;
+    companyName: string;
+    kycStatus: "approved";
+    createdAt: string;
+    updatedAt: string;
+  }): Promise<unknown>;
+  updateAsset(asset: Asset): Promise<Asset>;
+  getAssetById(assetId: string): Promise<Asset | null>;
+  listListings(): Promise<Array<{ id: string; assetId: string }>>;
+  listProductsByListingId(listingId: string): Promise<Array<{ id: string }>>;
+  deleteProduct(productId: string): Promise<void>;
+  deleteListing(listingId: string): Promise<void>;
+  deleteAsset(assetId: string): Promise<void>;
+};
 
 export class AmplifyAssetController implements AssetPort {
-  private readonly repository = new AmplifyInvestmentRepository();
-  private readonly service = new InvestmentPlatformService(this.repository, new AmplifyIdGenerator(), new AmplifyClock());
+  constructor(
+    private readonly repository: AssetRepository,
+    private readonly service: Pick<InvestmentPlatformService, "createAsset">,
+  ) {}
 
   async createAssetWithMedia(input: {
     tenantUserId: string;

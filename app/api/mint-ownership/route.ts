@@ -1,10 +1,11 @@
 import { ethers } from "ethers";
 import { NextResponse } from "next/server";
 
-import { OwnershipMintingProcessorService } from "@/src/application/use-cases/ownershipMintingProcessorService";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
-import { EthersOwnershipMintingGateway } from "@/src/infrastructure/gateways/ethersOwnershipMintingGateway";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
+import {
+  createInvestmentRepository,
+  createOwnershipMintingProcessorService,
+} from "@/src/infrastructure/composition/defaults";
 
 export const runtime = "nodejs";
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid token." }, { status: 401 });
     }
 
-    const repository = new AmplifyInvestmentRepository();
+    const repository = createInvestmentRepository();
     const order = await repository.getOrderById(cleanedOrderId);
     if (!order) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
@@ -154,10 +155,7 @@ export async function POST(request: Request) {
         );
       }
     }
-    const processor = new OwnershipMintingProcessorService(
-      repository,
-      new EthersOwnershipMintingGateway(),
-    );
+    const processor = createOwnershipMintingProcessorService(repository);
     const result = await processor.process({
       request: mintRequest.request,
       order,

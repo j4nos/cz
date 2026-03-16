@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import { AppLink } from "@/components/ui/AppLink";
 import styles from "./PhotoCta.module.css";
 
@@ -22,7 +24,7 @@ export function PhotoCta({
   return (
     <section className={`${styles.cta} ${reverse ? styles.reverse : ""}`.trim()}>
       <div className={styles.imageWrap}>
-        <img src={image} alt={title} className={styles.image} />
+        <Image src={image} alt={title} className={styles.image} width={1000} height={750} />
       </div>
       <div className={styles.content}>
         <h2>{title}</h2>

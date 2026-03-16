@@ -52,11 +52,11 @@ export class AmplifyChatRepository implements ChatRepository {
   }
 
   async listThreadsByUser(userId: string): Promise<ChatThreadSummary[]> {
-    const items = await listAll<Schema["UserThread"]["type"], { nextToken?: string }>((args) =>
+    const items = await listAll<Schema["UserThread"]["type"]>((nextToken) =>
       this.client.models.UserThread.list({
         filter: { userId: { eq: userId } },
-        ...(args ?? {}),
-      })
+        ...(nextToken ? { nextToken } : {}),
+      }),
     );
 
     return items
@@ -91,14 +91,14 @@ export class AmplifyChatRepository implements ChatRepository {
   }
 
   async listMessagesByThread(userId: string, threadId: string): Promise<ChatMessage[]> {
-    const items = await listAll<Schema["UserMessage"]["type"], { nextToken?: string }>((args) =>
+    const items = await listAll<Schema["UserMessage"]["type"]>((nextToken) =>
       this.client.models.UserMessage.list({
         filter: {
           threadId: { eq: threadId },
           userId: { eq: userId },
         },
-        ...(args ?? {}),
-      })
+        ...(nextToken ? { nextToken } : {}),
+      }),
     );
 
     return items

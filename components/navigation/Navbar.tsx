@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -67,7 +68,7 @@ export function Navbar() {
       <div className={styles.inner}>
         <div className={styles.left}>
           <Link href="/" className={styles.brand} aria-label="Cityzeen home">
-            <img src={LOGO_URL} alt="Cityzeen" className={styles.logo} />
+            <Image src={LOGO_URL} alt="Cityzeen" className={styles.logo} width={160} height={36} priority />
           </Link>
         </div>
 

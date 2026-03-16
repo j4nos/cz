@@ -6,6 +6,20 @@ import { generateClient } from "aws-amplify/data";
 
 vi.mock("aws-amplify/data", () => ({ generateClient: vi.fn() }));
 vi.mock("@/src/config/amplify", () => ({ ensureAmplifyConfigured: vi.fn() }));
+vi.mock("@/src/infrastructure/auth/verifyAccessToken", () => ({
+  verifyAccessToken: vi.fn().mockResolvedValue({ sub: "provider-1" }),
+}));
+vi.mock("@/src/infrastructure/gateways/dynamoDbRequestClaimGateway", () => ({
+  DynamoDbRequestClaimGateway: class {
+    async claimContractDeploymentRequest() {
+      return true;
+    }
+
+    async claimMintRequest() {
+      return true;
+    }
+  },
+}));
 vi.mock("@/artifacts/contracts/AssetToken20.sol/AssetToken20.json", () => ({
   default: { abi: [], bytecode: "0x00" },
 }));
@@ -26,9 +40,9 @@ vi.mock("ethers", () => {
     }
   }
   const deploy = vi.fn().mockResolvedValue({
-    waitForDeployment: vi.fn(),
-    getAddress: vi.fn().mockResolvedValue("0xcontract"),
-  });
+      waitForDeployment: vi.fn(),
+      getAddress: vi.fn().mockResolvedValue("0xcontract"),
+    });
   const supportsInterface = vi.fn().mockResolvedValue(true);
   class ContractFactory {
     deploy = deploy;
@@ -60,6 +74,7 @@ const makeRequest = (body: Record<string, unknown>) =>
     method: "POST",
     headers: {
       "content-type": "application/json",
+      authorization: "Bearer test-token",
     },
     body: JSON.stringify(body),
   });
@@ -72,15 +87,69 @@ const ethersMock = ethers as typeof ethers & {
   };
 };
 
+const generateClientMockFacade: {
+  mockReset(): void;
+  mockReturnValueOnce(client: unknown): void;
+} = generateClient as never;
+
+const setGenerateClientReturnValueOnce = (value: ReturnType<typeof makeClientMock>) => {
+  generateClientMockFacade.mockReturnValueOnce(value);
+};
+
+const makeClientMock = (assetGet: ReturnType<typeof vi.fn>, assetUpdate: ReturnType<typeof vi.fn>) => {
+  const requestCreate = vi.fn().mockResolvedValue({
+    data: {
+      id: "contract-deployment:asset-1",
+      assetId: "asset-1",
+      idempotencyKey: "contract-deployment:asset-1",
+      deploymentStatus: "queued",
+      runId: "run-1",
+      tokenStandard: "erc-721",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  });
+  const requestGet = vi.fn().mockResolvedValue({ data: null });
+  const requestUpdate = vi.fn().mockResolvedValue({
+    data: {
+      id: "contract-deployment:asset-1",
+      assetId: "asset-1",
+      idempotencyKey: "contract-deployment:asset-1",
+      deploymentStatus: "submitted",
+      runId: "run-1",
+      tokenStandard: "erc-721",
+      tokenAddress: "0xcontract",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  });
+
+  return {
+    models: {
+      Asset: { get: assetGet, update: assetUpdate },
+      ContractDeploymentRequest: {
+        create: requestCreate,
+        get: requestGet,
+        update: requestUpdate,
+      },
+    },
+  };
+};
+
 beforeEach(() => {
-  vi.mocked(generateClient).mockReset();
+  generateClientMockFacade.mockReset();
   process.env.POLYGON_RPC_URL = "http://rpc";
   process.env.PRIVATE_KEY = "secret";
+  ethersMock.__mocks.isAddress.mockImplementation((value: string) => value.startsWith("0x"));
+  ethersMock.__mocks.deploy.mockResolvedValue({
+    waitForDeployment: vi.fn(),
+    getAddress: vi.fn().mockResolvedValue("0xcontract"),
+  });
 });
 
 describe("POST /api/tokenize-asset", () => {
-  it("returns 400 when assetId or userId is missing", async () => {
-    const res = await POST(makeRequest({ assetId: "asset-1" }));
+  it("returns 400 when assetId is missing", async () => {
+    const res = await POST(makeRequest({}));
     expect(res.status).toBe(400);
   });
 
@@ -109,9 +178,7 @@ describe("POST /api/tokenize-asset", () => {
         imageUrls: [],
       },
     });
-    (vi.mocked(generateClient) as unknown as { mockReturnValueOnce: (value: unknown) => void }).mockReturnValueOnce({
-      models: { Asset: { get: assetGet, update: assetUpdate } },
-    });
+    setGenerateClientReturnValueOnce(makeClientMock(assetGet, assetUpdate));
 
     const res = await POST(
       makeRequest({ assetId: "asset-1", userId: "provider-1", owner: "not-an-address" }),
@@ -145,13 +212,11 @@ describe("POST /api/tokenize-asset", () => {
         imageUrls: [],
       },
     });
-    (vi.mocked(generateClient) as unknown as { mockReturnValueOnce: (value: unknown) => void }).mockReturnValueOnce({
-      models: { Asset: { get: assetGet, update: assetUpdate } },
-    });
+    setGenerateClientReturnValueOnce(makeClientMock(assetGet, assetUpdate));
     process.env.POLYGON_RPC_URL = "";
     process.env.PRIVATE_KEY = "";
 
-    const res = await POST(makeRequest({ assetId: "asset-1", userId: "provider-1" }));
+    const res = await POST(makeRequest({ assetId: "asset-1" }));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "RPC or private key missing." });
   });
@@ -185,14 +250,11 @@ describe("POST /api/tokenize-asset", () => {
         imageUrls: [],
       },
     });
-    (vi.mocked(generateClient) as unknown as { mockReturnValueOnce: (value: unknown) => void }).mockReturnValueOnce({
-      models: { Asset: { get: assetGet, update: assetUpdate } },
-    });
+    setGenerateClientReturnValueOnce(makeClientMock(assetGet, assetUpdate));
 
     const res = await POST(
       makeRequest({
         assetId: "asset-1",
-        userId: "provider-1",
         tokenStandard: "erc-721",
         name: "Demo",
         symbol: "DMO",

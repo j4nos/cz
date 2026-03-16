@@ -102,11 +102,11 @@ export class InvestmentPlatformService {
     const listing = await this.requireListing(input.listingId);
 
     if (input.minPurchase <= 0 || input.maxPurchase < input.minPurchase) {
-      throw new DomainError("Purchase limits are invalid.");
+      throw new DomainError({ code: "INVALID_PURCHASE_LIMITS" });
     }
 
     if (input.supplyTotal < input.maxPurchase) {
-      throw new DomainError("Supply total must cover max purchase.");
+      throw new DomainError({ code: "SUPPLY_TOTAL_TOO_LOW" });
     }
 
     return this.repository.createProduct({
@@ -135,20 +135,20 @@ export class InvestmentPlatformService {
 
     const listing = await this.requireListing(input.listingId);
     if (listing.saleStatus !== "open") {
-      throw new DomainError("Listing is not open for orders.");
+      throw new DomainError({ code: "LISTING_NOT_OPEN" });
     }
 
     const product = await this.requireProduct(input.productId);
     if (product.listingId !== listing.id) {
-      throw new DomainError("Product does not belong to the selected listing.");
+      throw new DomainError({ code: "PRODUCT_LISTING_MISMATCH" });
     }
 
     if (input.quantity < product.minPurchase || input.quantity > product.maxPurchase) {
-      throw new DomainError("Quantity is outside the allowed purchase range.");
+      throw new DomainError({ code: "QUANTITY_OUT_OF_RANGE" });
     }
 
     if (input.quantity > product.remainingSupply) {
-      throw new DomainError("Not enough remaining supply.");
+      throw new DomainError({ code: "INSUFFICIENT_REMAINING_SUPPLY" });
     }
 
     if (
@@ -156,7 +156,7 @@ export class InvestmentPlatformService {
       product.eligibleInvestorType !== "ANY" &&
       investor.investorType !== product.eligibleInvestorType
     ) {
-      throw new DomainError("Investor is not eligible for this product.");
+      throw new DomainError({ code: "INVESTOR_NOT_ELIGIBLE" });
     }
 
     const asset = await this.requireAsset(listing.assetId);
@@ -180,12 +180,15 @@ export class InvestmentPlatformService {
   async completeOrderPayment(input: { orderId: string }): Promise<Order> {
     const order = await this.requireOrder(input.orderId);
     if (order.status !== "pending") {
-      throw new DomainError("Only pending payment orders can be completed.");
+      throw new DomainError({ code: "ORDER_NOT_PENDING" });
     }
 
     const product = await this.requireProduct(order.productId);
     if (order.quantity > product.remainingSupply) {
-      throw new DomainError("Not enough remaining supply to complete the order.");
+      throw new DomainError({
+        code: "INSUFFICIENT_REMAINING_SUPPLY",
+        message: "Not enough remaining supply to complete the order.",
+      });
     }
 
     product.remainingSupply -= order.quantity;
@@ -198,7 +201,10 @@ export class InvestmentPlatformService {
   private async requireUser(id: string): Promise<UserProfile> {
     const user = await this.repository.getUserProfileById(id);
     if (!user) {
-      throw new DomainError(`UserProfile ${id} was not found.`);
+      throw new DomainError({
+        code: "USER_PROFILE_NOT_FOUND",
+        message: `UserProfile ${id} was not found.`,
+      });
     }
 
     return user;
@@ -207,7 +213,7 @@ export class InvestmentPlatformService {
   private async requireAsset(id: string): Promise<Asset> {
     const asset = await this.repository.getAssetById(id);
     if (!asset) {
-      throw new DomainError(`Asset ${id} was not found.`);
+      throw new DomainError({ code: "ASSET_NOT_FOUND", message: `Asset ${id} was not found.` });
     }
 
     return asset;
@@ -216,7 +222,7 @@ export class InvestmentPlatformService {
   private async requireListing(id: string): Promise<Listing> {
     const listing = await this.repository.getListingById(id);
     if (!listing) {
-      throw new DomainError(`Listing ${id} was not found.`);
+      throw new DomainError({ code: "LISTING_NOT_FOUND", message: `Listing ${id} was not found.` });
     }
 
     return listing;
@@ -225,7 +231,7 @@ export class InvestmentPlatformService {
   private async requireProduct(id: string): Promise<Product> {
     const product = await this.repository.getProductById(id);
     if (!product) {
-      throw new DomainError(`Product ${id} was not found.`);
+      throw new DomainError({ code: "PRODUCT_NOT_FOUND", message: `Product ${id} was not found.` });
     }
 
     return product;
@@ -234,7 +240,7 @@ export class InvestmentPlatformService {
   private async requireOrder(id: string): Promise<Order> {
     const order = await this.repository.getOrderById(id);
     if (!order) {
-      throw new DomainError(`Order ${id} was not found.`);
+      throw new DomainError({ code: "ORDER_NOT_FOUND", message: `Order ${id} was not found.` });
     }
 
     return order;

@@ -1,31 +1,30 @@
 import { NextResponse } from "next/server";
 
-import { TokenizationService } from "@/src/application/use-cases/tokenizationService";
-import { EthersTokenizationGateway } from "@/src/infrastructure/gateways/ethersTokenizationGateway";
-import { AmplifyInvestmentRepository } from "@/src/infrastructure/repositories/amplifyInvestmentRepository";
+import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
 import { DomainError } from "@/src/domain/value-objects/errors";
+import { createTokenizationService } from "@/src/infrastructure/composition/defaults";
+import { createDomainErrorResponse } from "@/src/infrastructure/http/domainErrorResponse";
 
 export const runtime = "nodejs";
 
-class TokenizationRunIdGenerator {
-  next(): string {
-    return typeof crypto !== "undefined" ? crypto.randomUUID() : `run-${Date.now()}`;
-  }
-}
-
-function createService() {
-  return new TokenizationService(
-    new AmplifyInvestmentRepository(),
-    new EthersTokenizationGateway(),
-    new TokenizationRunIdGenerator(),
-  );
-}
-
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length).trim()
+      : "";
+    if (!token) {
+      return NextResponse.json({ error: "Missing bearer token." }, { status: 401 });
+    }
+
+    const payload = await verifyAccessToken(token);
+    const userId = payload.sub as string | undefined;
+    if (!userId) {
+      return NextResponse.json({ error: "Invalid token." }, { status: 401 });
+    }
+
     const body = (await request.json()) as {
       assetId?: string;
-      userId?: string;
       name?: string;
       symbol?: string;
       owner?: string;
@@ -33,10 +32,9 @@ export async function POST(request: Request) {
     };
 
     const assetId = body.assetId?.trim();
-    const userId = body.userId?.trim();
 
-    if (!assetId || !userId) {
-      return NextResponse.json({ error: "assetId and userId are required." }, { status: 400 });
+    if (!assetId) {
+      return NextResponse.json({ error: "assetId is required." }, { status: 400 });
     }
 
     const service = createService();
@@ -57,22 +55,14 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof DomainError) {
-      const status =
-        error.message === "Asset not found."
-          ? 404
-          : error.message === "Forbidden."
-          ? 403
-          : error.message === "Contract deployment already in progress."
-          ? 409
-          : error.message === "Invalid owner address."
-          ? 400
-          : error.message === "RPC or private key missing."
-          ? 500
-          : 400;
-      return NextResponse.json({ error: error.message }, { status });
+      return createDomainErrorResponse(error);
     }
 
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function createService() {
+  return createTokenizationService();
 }

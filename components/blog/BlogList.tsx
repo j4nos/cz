@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import type { BlogPost } from "@/src/domain/entities/content";
 import { AppLink } from "@/components/ui/AppLink";
 
@@ -26,10 +28,12 @@ export function BlogList({ posts }: { posts: BlogPost[] }) {
       {posts.map((post) => (
         <article key={post.id} className={styles.card}>
           {post.coverImage ? (
-            <img
+            <Image
               className={styles.cover}
               src={post.coverImage}
               alt={post.title}
+              width={960}
+              height={640}
             />
           ) : null}
           <div className={styles.content}>

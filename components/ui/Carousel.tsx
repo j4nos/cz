@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 
 import { Button } from "./Button";
@@ -26,10 +27,12 @@ export function Carousel({ images, altPrefix = "Slide" }: CarouselProps) {
   return (
     <section className={styles.carousel}>
       <div className={styles.imageWrap}>
-        <img
+        <Image
           src={images[active]}
           alt={`${altPrefix} ${active + 1}`}
           className={styles.image}
+          width={1200}
+          height={900}
         />
       </div>
       <div className={styles.controls}>
