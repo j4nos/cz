@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "@/src/application/interfaces/authClient";
 import type { UserProfile } from "@/src/domain/entities";
 import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
+import { CheckIsAdminUserUseCase } from "@/src/application/use-cases/CheckIsAdminUserUseCase";
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -14,6 +15,7 @@ type AuthContextValue = {
   getAccessToken: () => string | null;
   profile: UserProfile | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<UserProfile | null>;
@@ -43,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function loadProfile(nextUser: AuthUser | null) {
@@ -92,6 +95,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [authClient]);
 
+  // Check admin status when authentication state changes
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!Boolean(user)) {
+        setIsAdmin(false);
+        return;
+      }
+      try {
+        const useCase = new CheckIsAdminUserUseCase();
+        const result = await useCase.execute();
+        setIsAdmin(result);
+      } catch (error) {
+        console.error("Failed to check admin status:", error);
+        setIsAdmin(false);
+      }
+    };
+    void checkAdminStatus();
+  }, [user]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -101,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       getAccessToken: () => accessToken,
       profile,
       isAuthenticated: Boolean(user),
+      isAdmin,
       loading,
       error,
       login: async (email, password) => {
@@ -192,6 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           setProfile(null);
           setAccessToken(null);
+          setIsAdmin(false);
         } finally {
           setLoading(false);
         }
@@ -200,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await loadProfile(authClient.getCurrentUser());
       },
     }),
-    [accessToken, authClient, error, loading, profile, user],
+    [accessToken, authClient, error, isAdmin, loading, profile, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

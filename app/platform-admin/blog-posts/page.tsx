@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   BlogPostForm,
@@ -21,7 +21,7 @@ import { createBlogAdminController } from "@/src/infrastructure/controllers/crea
 import { blogCoverPrefix, toSafeFileName } from "@/src/infrastructure/storage/publicUrls";
 
 export default function PlatformAdminBlogPostsPage() {
-  const { loading, isAuthenticated, profile } = useAuth();
+  const { loading, isAuthenticated, isAdmin } = useAuth();
   const { setToast } = useToast();
   const controller = useMemo(() => createBlogAdminController(), []);
   const blogPostAdminService = useMemo(
@@ -51,18 +51,16 @@ export default function PlatformAdminBlogPostsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
 
-  const isPlatformAdmin = profile?.role === "platform-admin";
-
   const loadPosts = useCallback(async () => {
     const next = await blogPostAdminService.loadPosts();
     setPosts(next);
   }, [blogPostAdminService]);
 
   useEffect(() => {
-    if (!loading && isAuthenticated && isPlatformAdmin) {
+    if (!loading && isAuthenticated && isAdmin) {
       void loadPosts();
     }
-  }, [isAuthenticated, isPlatformAdmin, loadPosts, loading]);
+  }, [isAuthenticated, isAdmin, loadPosts, loading]);
 
   const editingPost = useMemo(
     () => posts.find((post) => post.id === editingPostId) ?? null,
@@ -112,7 +110,7 @@ export default function PlatformAdminBlogPostsPage() {
     return <p className="muted">Login to manage blog posts.</p>;
   }
 
-  if (!isPlatformAdmin) {
+  if (!isAdmin) {
     return <p className="muted">Only platform admins can access this page.</p>;
   }
 

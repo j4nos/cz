@@ -58,10 +58,9 @@ function Dropdown({ label, items }: { label: string; items: MenuItem[] }) {
 }
 
 export function Navbar() {
-  const { isAuthenticated, user, profile, logout, loading } = useAuth();
+  const { isAuthenticated, user, logout, loading, isAdmin } = useAuth();
   const { isLoading } = useLoading();
   const router = useRouter();
-  const isPlatformAdmin = profile?.role === "platform-admin";
 
   return (
     <header className={styles.header}>
@@ -80,7 +79,7 @@ export function Navbar() {
             <>
               <Dropdown label="Asset Provider" items={assetProviderMenu} />
               <Dropdown label="Investor" items={investorMenu} />
-              {isPlatformAdmin ? (
+              {isAdmin ? (
                 <Dropdown label="Platform Admin" items={platformAdminMenu} />
               ) : null}
             </>

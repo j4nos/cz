@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getCurrentUser } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 
 import { Button } from "@/components/ui/Button";
@@ -8,8 +9,10 @@ import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { useToast } from "@/contexts/ToastContext";
 import type { Schema } from "@/amplify/data/resource";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function PlatformAdminHomepageCtaPage() {
+  const { isAuthenticated, loading, isAdmin } = useAuth();
   const client = useMemo(() => {
     ensureAmplifyConfigured();
     return generateClient<Schema>();
@@ -50,28 +53,42 @@ export default function PlatformAdminHomepageCtaPage() {
     });
 
     if (existing.data) {
+      const user = await getCurrentUser();
       await client.models.PlatformSettings.update({
         id: "homepage",
         homepageFirstAssetId: firstAssetId,
         homepageFirstListingId: firstListingId,
         homepageSecondAssetId: secondAssetId,
         homepageSecondListingId: secondListingId,
-        updatedByUserId: "platform-admin",
+        updatedByUserId: user.username,
         updatedAt: new Date().toISOString(),
       });
     } else {
+      const user = await getCurrentUser();
       await client.models.PlatformSettings.create({
         id: "homepage",
         homepageFirstAssetId: firstAssetId,
         homepageFirstListingId: firstListingId,
         homepageSecondAssetId: secondAssetId,
         homepageSecondListingId: secondListingId,
-        updatedByUserId: "platform-admin",
+        updatedByUserId: user.username,
         updatedAt: new Date().toISOString(),
       });
     }
 
     setToast("Setting saved", "success", 2000);
+  }
+
+  if (loading) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
+    return <p className="muted">Login to manage homepage CTA.</p>;
+  }
+
+  if (!isAdmin) {
+    return <p className="muted">Only platform admins can access this page.</p>;
   }
 
   return (

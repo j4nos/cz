@@ -19,7 +19,7 @@ const schema = a.schema({
       documentUploads: a.hasMany("DocumentMeta", "uploadedByUserId"),
       threads: a.hasMany("UserThread", "userId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   UserThread: a
     .model({
@@ -30,7 +30,7 @@ const schema = a.schema({
       user: a.belongsTo("UserProfile", "userId"),
       messages: a.hasMany("UserMessage", "threadId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   UserMessage: a
     .model({
@@ -42,7 +42,7 @@ const schema = a.schema({
       thread: a.belongsTo("UserThread", "threadId"),
       user: a.belongsTo("UserProfile", "userId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   Asset: a
     .model({
@@ -64,7 +64,7 @@ const schema = a.schema({
       dueDiligenceRuns: a.hasMany("DueDiligenceRun", "assetId"),
       contractDeploymentRequests: a.hasMany("ContractDeploymentRequest", "assetId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   Listing: a
     .model({
@@ -83,7 +83,7 @@ const schema = a.schema({
       products: a.hasMany("Product", "listingId"),
       orders: a.hasMany("Order", "listingId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   Product: a
     .model({
@@ -100,7 +100,7 @@ const schema = a.schema({
       pricingTiers: a.hasMany("PricingTier", "productId"),
       orders: a.hasMany("Order", "productId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   PricingTier: a
     .model({
@@ -109,7 +109,7 @@ const schema = a.schema({
       discountedUnitPrice: a.float().required(),
       product: a.belongsTo("Product", "productId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   Order: a
     .model({
@@ -148,7 +148,7 @@ const schema = a.schema({
       product: a.belongsTo("Product", "productId"),
       mintRequests: a.hasMany("MintRequest", "orderId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   ContractDeploymentRequest: a
     .model({
@@ -164,7 +164,7 @@ const schema = a.schema({
       updatedAt: a.datetime(),
       asset: a.belongsTo("Asset", "assetId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   MintRequest: a
     .model({
@@ -182,7 +182,7 @@ const schema = a.schema({
       updatedAt: a.datetime(),
       order: a.belongsTo("Order", "orderId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   DocumentMeta: a
     .model({
@@ -195,7 +195,7 @@ const schema = a.schema({
       asset: a.belongsTo("Asset", "assetId"),
       uploadedByUser: a.belongsTo("UserProfile", "uploadedByUserId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   DueDiligenceRun: a
     .model({
@@ -207,7 +207,7 @@ const schema = a.schema({
       missingSummary: a.string(),
       asset: a.belongsTo("Asset", "assetId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   UserSubscription: a
     .model({
@@ -217,7 +217,7 @@ const schema = a.schema({
       price: a.float().required(),
       investor: a.belongsTo("UserProfile", "investorId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   PlatformSettings: a
     .model({
@@ -228,7 +228,7 @@ const schema = a.schema({
       updatedByUserId: a.id().required(),
       updatedAt: a.datetime(),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 
   BlogPost: a
     .model({
@@ -240,7 +240,10 @@ const schema = a.schema({
       publishedAt: a.datetime(),
       updatedAt: a.datetime(),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [
+      allow.publicApiKey().to(['read']),
+      allow.groups(['admin']),
+    ]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
@@ -248,7 +251,7 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: "apiKey",
+    defaultAuthorizationMode: "userPool",
     apiKeyAuthorizationMode: {
       expiresInDays: 30,
     },
