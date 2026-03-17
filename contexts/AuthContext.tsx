@@ -18,6 +18,7 @@ type AuthContextValue = {
   isAdmin: boolean;
   loading: boolean;
   error: string | null;
+  ensureAnonymous: () => Promise<AuthUser>;
   login: (email: string, password: string) => Promise<UserProfile | null>;
   register: (input: {
     email: string;
@@ -38,10 +39,12 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const ANON_KEY = "cityzeen:anon-user-id";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const authClient = useMemo(() => createAuthClient(), []);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [anonUser, setAnonUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,6 +66,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadProfile(nextUser);
     setAccessToken(await authClient.getAccessToken());
   }
+
+  async function claimAnonymousSession(toUserId: string) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const fromUserId = window.localStorage.getItem(ANON_KEY);
+    if (!fromUserId || fromUserId === toUserId) {
+      return;
+    }
+
+    try {
+      const token = await authClient.getAccessToken();
+      await fetch("/api/chat/claim", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ toUserId }),
+      });
+    } finally {
+      window.localStorage.removeItem(ANON_KEY);
+      setAnonUser(null);
+    }
+  }
+
+  async function ensureAnonymous(): Promise<AuthUser> {
+    const current = authClient.getCurrentUser() ?? user;
+    if (current) {
+      return current;
+    }
+
+    if (anonUser) {
+      return anonUser;
+    }
+
+    if (typeof window !== "undefined") {
+      const cached = window.localStorage.getItem(ANON_KEY);
+      if (cached) {
+        const nextAnonUser = { uid: cached };
+        setAnonUser(nextAnonUser);
+        return nextAnonUser;
+      }
+    }
+
+    const response = await fetch("/api/chat/anonymous", { method: "POST" });
+    if (!response.ok) {
+      throw new Error("Failed to start anonymous session.");
+    }
+    const data = (await response.json()) as { userId?: string };
+    if (!data.userId) {
+      throw new Error("Anonymous session missing user id.");
+    }
+
+    const nextAnonUser = { uid: data.userId };
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ANON_KEY, data.userId);
+    }
+    setAnonUser(nextAnonUser);
+    return nextAnonUser;
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const cachedAnonId = window.localStorage.getItem(ANON_KEY);
+    if (!cachedAnonId || user) {
+      return;
+    }
+
+    setAnonUser({ uid: cachedAnonId });
+  }, [user]);
 
   useEffect(() => {
     let active = true;
@@ -117,8 +195,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      activeUser: user,
-      getActiveUser: () => authClient.getCurrentUser(),
+      activeUser: user ?? anonUser,
+      getActiveUser: () => authClient.getCurrentUser() ?? anonUser,
       accessToken,
       getAccessToken: () => accessToken,
       profile,
@@ -126,6 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin,
       loading,
       error,
+      ensureAnonymous,
       login: async (email, password) => {
         setError(null);
         setLoading(true);
@@ -136,6 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(nextUser);
           setProfile(nextProfile);
           setAccessToken(await authClient.getAccessToken());
+          await claimAnonymousSession(nextUser.uid);
           return nextProfile;
         } catch (nextError) {
           setError(nextError instanceof Error ? nextError.message : "Login failed.");
@@ -161,6 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               companyName: role === "ASSET_PROVIDER" ? "Cityzeen Assets" : undefined,
             });
             await refreshSessionState(result.user);
+            await claimAnonymousSession(result.user.uid);
             return { needsConfirmation: result.needsConfirmation, profile: await authClient.getUserProfile(result.user.uid) };
           }
 
@@ -190,6 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(nextUser);
           setProfile(nextProfile);
           setAccessToken(await authClient.getAccessToken());
+          await claimAnonymousSession(nextUser.uid);
           return nextProfile;
         } catch (nextError) {
           setError(nextError instanceof Error ? nextError.message : "Confirmation failed.");
@@ -224,7 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await loadProfile(authClient.getCurrentUser());
       },
     }),
-    [accessToken, authClient, error, isAdmin, loading, profile, user],
+    [accessToken, anonUser, authClient, error, isAdmin, loading, profile, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

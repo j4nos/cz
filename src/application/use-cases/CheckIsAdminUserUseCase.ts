@@ -1,4 +1,4 @@
-import { getCurrentUser } from "aws-amplify/auth";
+import { fetchAuthSession } from "aws-amplify/auth";
 
 /**
  * Use case: Check if the current user is an admin (belongs to 'admin' Cognito group)
@@ -6,8 +6,13 @@ import { getCurrentUser } from "aws-amplify/auth";
 export class CheckIsAdminUserUseCase {
   async execute(): Promise<boolean> {
     try {
-      const user = await getCurrentUser();
-      const groups = user.signInDetails?.loginAttributes?.groups || [];
+      const session = await fetchAuthSession();
+      const groupsClaim = session.tokens?.idToken?.payload?.["cognito:groups"];
+      const groups = Array.isArray(groupsClaim)
+        ? groupsClaim
+        : typeof groupsClaim === "string"
+          ? [groupsClaim]
+          : [];
       return groups.includes("admin");
     } catch (error) {
       console.error("Failed to check admin status:", error);

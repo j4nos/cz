@@ -35,7 +35,7 @@ type ChatPanelProps = {
 };
 
 export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
-  const { activeUser } = useAuth();
+  const { activeUser, ensureAnonymous } = useAuth();
   const resolvedUserId = activeUser?.uid ?? userId ?? "";
   const [draft, setDraft] = useState("");
   const [threadId, setThreadId] = useState(() =>
@@ -44,6 +44,16 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeUser || userId) {
+      return;
+    }
+
+    void ensureAnonymous().catch(() => {
+      // Keep silent here; send() will surface a user-facing error if needed.
+    });
+  }, [activeUser, ensureAnonymous, userId]);
 
   useEffect(() => {
     if (!resolvedUserId) {
@@ -87,7 +97,26 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
 
   async function send() {
     const text = draft.trim();
-    if (!text || !resolvedUserId) {
+    if (!text) {
+      return;
+    }
+
+    let currentUser = activeUser;
+    if (!currentUser) {
+      try {
+        currentUser = await ensureAnonymous();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Could not start anonymous chat.";
+        setMessages((current) => [
+          ...current,
+          { id: `${threadId}-e-${Date.now()}`, role: "assistant", text: message, createdAt: new Date().toISOString() },
+        ]);
+        return;
+      }
+    }
+
+    const currentUserId = currentUser?.uid ?? userId ?? "";
+    if (!currentUserId) {
       return;
     }
 
@@ -101,7 +130,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
         body: JSON.stringify({
           threadId,
           input: text,
-          userId: resolvedUserId,
+          userId: currentUserId,
         }),
       });
 
@@ -183,7 +212,6 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
       </div>
 
       <div className={styles.messages}>
-        {!resolvedUserId ? <div className={`${styles.bubble} ${styles.ai}`.trim()}>Login to start a chat thread.</div> : null}
         {messages.map((message) => (
           <div
             className={`${styles.bubble} ${message.role === "user" ? styles.client : styles.ai}`.trim()}
@@ -198,9 +226,8 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
         <div className={styles.composeRow}>
           <textarea
             className={styles.input}
-            disabled={!resolvedUserId}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder={resolvedUserId ? "Message" : "Login to message the assistant"}
+            placeholder="Message"
             rows={3}
             value={draft}
           />
@@ -229,7 +256,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
             {isLoading ? <FontAwesomeIcon icon={faCircleNotch} spin /> : null}
           </button>
           <Button
-            disabled={isLoading || !resolvedUserId}
+            disabled={isLoading}
             onClick={send}
             type="button"
             aria-label="Send message"
