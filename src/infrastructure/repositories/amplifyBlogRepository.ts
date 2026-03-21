@@ -2,16 +2,23 @@ import type { Schema } from "@/amplify/data/resource";
 import type { BlogPost } from "@/src/domain/entities/content";
 import { listAll } from "@/src/infrastructure/amplify/pagination";
 import { mapBlogPostRecord } from "@/src/infrastructure/amplify/schemaMappers";
-import type { AmplifyDataClient } from "@/src/infrastructure/repositories/amplifyClient";
+import type {
+  AmplifyDataClient,
+  AmplifyReadAuthMode,
+} from "@/src/infrastructure/repositories/amplifyClient";
 import { normalizeStoredPublicPath } from "@/src/infrastructure/storage/publicUrls";
 
 export class AmplifyBlogRepository {
-  constructor(private readonly client: AmplifyDataClient) {}
+  constructor(
+    private readonly client: AmplifyDataClient,
+    private readonly readAuthMode?: AmplifyReadAuthMode,
+  ) {}
 
   async listPublishedBlogPosts(): Promise<BlogPost[]> {
     const records = await listAll<Schema["BlogPost"]["type"]>((nextToken) =>
       this.client.models.BlogPost.list({
         filter: { status: { eq: "published" } },
+        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -20,7 +27,10 @@ export class AmplifyBlogRepository {
 
   async listBlogPosts(): Promise<BlogPost[]> {
     const records = await listAll<Schema["BlogPost"]["type"]>((nextToken) =>
-      this.client.models.BlogPost.list(nextToken ? { nextToken } : undefined),
+      this.client.models.BlogPost.list({
+        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+        ...(nextToken ? { nextToken } : {}),
+      }),
     );
     return records.map(mapBlogPostRecord);
   }

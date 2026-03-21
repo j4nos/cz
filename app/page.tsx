@@ -19,7 +19,10 @@ export const revalidate = 60;
 export default async function Home() {
   ensureAmplifyConfigured();
   const client = generateClient<Schema>();
-  const { data: settings } = await client.models.PlatformSettings.get({ id: "homepage" });
+  const { data: settings } = await client.models.PlatformSettings.get(
+    { id: "homepage" },
+    { authMode: "apiKey" },
+  );
 
   const firstListingId = settings?.homepageFirstListingId;
   const secondListingId = settings?.homepageSecondListingId;

@@ -5,12 +5,25 @@ import {
   mapAssetRecord,
   type AssetRecord,
 } from "@/src/infrastructure/amplify/schemaMappers";
-import type { AmplifyDataClient } from "@/src/infrastructure/repositories/amplifyClient";
+import type {
+  AmplifyDataClient,
+  AmplifyReadAuthMode,
+} from "@/src/infrastructure/repositories/amplifyClient";
 import { mapContractDeploymentRequestRecord } from "@/src/infrastructure/repositories/amplifyWorkflowRecords";
 import { normalizeStoredPublicPath } from "@/src/infrastructure/storage/publicUrls";
 
 export class AmplifyAssetRepository {
-  constructor(private readonly client: AmplifyDataClient) {}
+  constructor(
+    private readonly client: AmplifyDataClient,
+    private readonly readAuthMode?: AmplifyReadAuthMode,
+  ) {}
+
+  private withReadAuth(input?: Record<string, unknown>) {
+    return {
+      ...(input ?? {}),
+      ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+    };
+  }
 
   async createAsset(input: Asset): Promise<Asset> {
     const response = await this.client.models.Asset.create({
@@ -33,7 +46,10 @@ export class AmplifyAssetRepository {
   }
 
   async getAssetById(id: string): Promise<Asset | null> {
-    const response = await this.client.models.Asset.get({ id });
+    const response = await this.client.models.Asset.get(
+      { id },
+      this.withReadAuth(),
+    );
     return response.data ? mapAssetRecord(response.data) : null;
   }
 
@@ -80,13 +96,18 @@ export class AmplifyAssetRepository {
 
   async listAssets(): Promise<AssetRecord[]> {
     const records = await listAll<Schema["Asset"]["type"]>((nextToken) =>
-      this.client.models.Asset.list(nextToken ? { nextToken } : undefined),
+      this.client.models.Asset.list(
+        this.withReadAuth(nextToken ? { nextToken } : undefined),
+      ),
     );
     return records.map(mapAssetRecord);
   }
 
   async getContractDeploymentRequestById(id: string): Promise<ContractDeploymentRequest | null> {
-    const response = await this.client.models.ContractDeploymentRequest.get({ id });
+    const response = await this.client.models.ContractDeploymentRequest.get(
+      { id },
+      this.withReadAuth(),
+    );
     return response.data ? mapContractDeploymentRequestRecord(response.data) : null;
   }
 

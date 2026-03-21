@@ -4,6 +4,7 @@ import type { Schema } from "@/amplify/data/resource";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
 
 export type AmplifyDataClient = ReturnType<typeof generateClient<Schema>>;
+export type AmplifyReadAuthMode = "apiKey" | "userPool";
 
 export function createAmplifyDataClient(): AmplifyDataClient {
   ensureAmplifyConfigured();

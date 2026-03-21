@@ -2,11 +2,24 @@ import type { Schema } from "@/amplify/data/resource";
 import type { MintRequest, Order } from "@/src/domain/entities";
 import { listAll } from "@/src/infrastructure/amplify/pagination";
 import { mapOrderRecord } from "@/src/infrastructure/amplify/schemaMappers";
-import type { AmplifyDataClient } from "@/src/infrastructure/repositories/amplifyClient";
+import type {
+  AmplifyDataClient,
+  AmplifyReadAuthMode,
+} from "@/src/infrastructure/repositories/amplifyClient";
 import { mapMintRequestRecord } from "@/src/infrastructure/repositories/amplifyWorkflowRecords";
 
 export class AmplifyOrderRepository {
-  constructor(private readonly client: AmplifyDataClient) {}
+  constructor(
+    private readonly client: AmplifyDataClient,
+    private readonly readAuthMode?: AmplifyReadAuthMode,
+  ) {}
+
+  private withReadAuth(input?: Record<string, unknown>) {
+    return {
+      ...(input ?? {}),
+      ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+    };
+  }
 
   async createOrder(input: Order): Promise<Order> {
     const response = await this.client.models.Order.create({
@@ -30,7 +43,10 @@ export class AmplifyOrderRepository {
   }
 
   async getOrderById(id: string): Promise<Order | null> {
-    const response = await this.client.models.Order.get({ id });
+    const response = await this.client.models.Order.get(
+      { id },
+      this.withReadAuth(),
+    );
     return response.data ? mapOrderRecord(response.data) : null;
   }
 
@@ -38,6 +54,7 @@ export class AmplifyOrderRepository {
     const records = await listAll<Schema["Order"]["type"]>((nextToken) =>
       this.client.models.Order.list({
         filter: { paymentProviderId: { eq: paymentProviderId } },
+        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -71,6 +88,7 @@ export class AmplifyOrderRepository {
     const records = await listAll<Schema["Order"]["type"]>((nextToken) =>
       this.client.models.Order.list({
         filter: { investorId: { eq: investorId } },
+        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -81,6 +99,7 @@ export class AmplifyOrderRepository {
     const records = await listAll<Schema["Order"]["type"]>((nextToken) =>
       this.client.models.Order.list({
         filter: { providerUserId: { eq: providerUserId } },
+        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -88,7 +107,10 @@ export class AmplifyOrderRepository {
   }
 
   async getMintRequestById(id: string): Promise<MintRequest | null> {
-    const response = await this.client.models.MintRequest.get({ id });
+    const response = await this.client.models.MintRequest.get(
+      { id },
+      this.withReadAuth(),
+    );
     return response.data ? mapMintRequestRecord(response.data) : null;
   }
 

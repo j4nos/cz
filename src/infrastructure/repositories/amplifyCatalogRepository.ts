@@ -2,10 +2,23 @@ import type { Schema } from "@/amplify/data/resource";
 import type { Listing, Product } from "@/src/domain/entities";
 import { listAll } from "@/src/infrastructure/amplify/pagination";
 import { mapListingRecord, mapProductRecord } from "@/src/infrastructure/amplify/schemaMappers";
-import type { AmplifyDataClient } from "@/src/infrastructure/repositories/amplifyClient";
+import type {
+  AmplifyDataClient,
+  AmplifyReadAuthMode,
+} from "@/src/infrastructure/repositories/amplifyClient";
 
 export class AmplifyCatalogRepository {
-  constructor(private readonly client: AmplifyDataClient) {}
+  constructor(
+    private readonly client: AmplifyDataClient,
+    private readonly readAuthMode?: AmplifyReadAuthMode,
+  ) {}
+
+  private withReadAuth(input?: Record<string, unknown>) {
+    return {
+      ...(input ?? {}),
+      ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+    };
+  }
 
   async createListing(input: Listing): Promise<Listing> {
     const response = await this.client.models.Listing.create({
@@ -26,7 +39,10 @@ export class AmplifyCatalogRepository {
   }
 
   async getListingById(id: string): Promise<Listing | null> {
-    const response = await this.client.models.Listing.get({ id });
+    const response = await this.client.models.Listing.get(
+      { id },
+      this.withReadAuth(),
+    );
     return response.data ? mapListingRecord(response.data) : null;
   }
 
@@ -54,7 +70,9 @@ export class AmplifyCatalogRepository {
 
   async listListings(): Promise<Listing[]> {
     const records = await listAll<Schema["Listing"]["type"]>((nextToken) =>
-      this.client.models.Listing.list(nextToken ? { nextToken } : undefined),
+      this.client.models.Listing.list(
+        this.withReadAuth(nextToken ? { nextToken } : undefined),
+      ),
     );
     return records.map(mapListingRecord);
   }
@@ -77,7 +95,10 @@ export class AmplifyCatalogRepository {
   }
 
   async getProductById(id: string): Promise<Product | null> {
-    const response = await this.client.models.Product.get({ id });
+    const response = await this.client.models.Product.get(
+      { id },
+      this.withReadAuth(),
+    );
     return response.data ? mapProductRecord(response.data) : null;
   }
 
@@ -105,6 +126,7 @@ export class AmplifyCatalogRepository {
     const records = await listAll<Schema["Product"]["type"]>((nextToken) =>
       this.client.models.Product.list({
         filter: { listingId: { eq: listingId } },
+        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
         ...(nextToken ? { nextToken } : {}),
       }),
     );

@@ -1,6 +1,10 @@
 import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
 import type { AssetTokenizationRepository } from "@/src/application/interfaces/tokenizationPorts";
-import { createAmplifyDataClient } from "@/src/infrastructure/repositories/amplifyClient";
+import {
+  createAmplifyDataClient,
+  type AmplifyDataClient,
+  type AmplifyReadAuthMode,
+} from "@/src/infrastructure/repositories/amplifyClient";
 import { AmplifyAssetRepository } from "@/src/infrastructure/repositories/amplifyAssetRepository";
 import { AmplifyBlogRepository } from "@/src/infrastructure/repositories/amplifyBlogRepository";
 import { AmplifyCatalogRepository } from "@/src/infrastructure/repositories/amplifyCatalogRepository";
@@ -16,13 +20,15 @@ export class AmplifyInvestmentRepository
   private readonly orders;
   private readonly blog;
 
-  constructor() {
-    const client = createAmplifyDataClient();
+  constructor(
+    client: AmplifyDataClient = createAmplifyDataClient(),
+    readAuthMode?: AmplifyReadAuthMode,
+  ) {
     this.userProfiles = new AmplifyUserProfileRepository(client);
-    this.assets = new AmplifyAssetRepository(client);
-    this.catalog = new AmplifyCatalogRepository(client);
-    this.orders = new AmplifyOrderRepository(client);
-    this.blog = new AmplifyBlogRepository(client);
+    this.assets = new AmplifyAssetRepository(client, readAuthMode);
+    this.catalog = new AmplifyCatalogRepository(client, readAuthMode);
+    this.orders = new AmplifyOrderRepository(client, readAuthMode);
+    this.blog = new AmplifyBlogRepository(client, readAuthMode);
   }
 
   createUserProfile(input: Parameters<AmplifyUserProfileRepository["createUserProfile"]>[0]) {
