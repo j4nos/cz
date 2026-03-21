@@ -22,6 +22,11 @@ export default function AssetWizardStep1Page() {
     event.preventDefault();
 
     try {
+      if (!user) {
+        setToast("Login required to save asset basics.", "danger", 2500);
+        return;
+      }
+
       const assetId = state.assetId || crypto.randomUUID();
       const repository = createInvestmentRepository();
       const existingAsset = await repository.getAssetById(assetId);
@@ -46,14 +51,12 @@ export default function AssetWizardStep1Page() {
           assetClass: state.assetClass,
           tokenStandard: state.tokenStandard,
             status: "draft",
-            missingDocsCount: existingAsset?.missingDocsCount ?? 0,
-            imageUrls: existingAsset?.imageUrls ?? [],
-            beneficiaryIban: existingAsset?.beneficiaryIban,
-            beneficiaryLabel: existingAsset?.beneficiaryLabel,
+            missingDocsCount: 0,
+            imageUrls: [],
           });
 
       updateState({ assetId: savedAsset.id });
-      router.push("/asset-provider/assets/new/step-2");
+      router.push(`/asset-provider/assets/new/step-2?assetId=${savedAsset.id}`);
     } catch (error) {
       console.error("[asset-step-1] save failed", error);
       setToast(
@@ -104,7 +107,9 @@ export default function AssetWizardStep1Page() {
             id="asset-token-standard"
             value={state.tokenStandard}
             onChange={(event) =>
-              updateState({ tokenStandard: event.target.value })
+              updateState({
+                tokenStandard: event.target.value as "ERC-20" | "ERC-721",
+              })
             }
             options={[
               { value: "ERC-20", label: "ERC-20" },

@@ -1,15 +1,16 @@
 "use client";
 
 import { generateClient } from "aws-amplify/data";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { uploadData } from "aws-amplify/storage";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import type { Schema } from "@/amplify/data/resource";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
+import { useAuth } from "@/contexts/AuthContext";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
 import { useToast } from "@/contexts/ToastContext";
-import { uploadData } from "aws-amplify/storage";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import {
   assetImagePrefix,
@@ -18,27 +19,54 @@ import {
 } from "@/src/infrastructure/storage/publicUrls";
 
 export default function AssetWizardStep2Page() {
+  return (
+    <Suspense fallback={null}>
+      <Step2Content />
+    </Suspense>
+  );
+}
+
+function Step2Content() {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const { state } = useAssetWizard();
+  const searchAssetId = searchParams.get("assetId") ?? "";
+  const { user } = useAuth();
+  const { state, updateState } = useAssetWizard();
+  const assetId = searchAssetId || state.assetId || "";
   const { setToast } = useToast();
   const [files, setFiles] = useState<File[]>([]);
 
-  if (!state.assetId) {
+  useEffect(() => {
+    if (searchAssetId && searchAssetId !== state.assetId) {
+      updateState({ assetId: searchAssetId });
+    }
+  }, [searchAssetId, state.assetId, updateState]);
+
+  if (!assetId) {
     return <p className="muted">Missing assetId. Complete Step 1 first.</p>;
+  }
+
+  if (!user) {
+    return <p className="muted">Login to upload photos.</p>;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!assetId) {
+      setToast("Missing assetId. Complete Step 1 first.", "danger", 2000);
+      return;
+    }
+
     if (!files.length) {
-      setToast("Please select file(s).", "warning", 2000);
+      setToast("Please select file(s)", "warning", 2000);
       return;
     }
 
     const uploadedPaths = await Promise.all(
       files.map(async (file, index) => {
         const fileName = `${Date.now()}-${index}-${toSafeFileName(file.name)}`;
-        const path = `${assetImagePrefix(state.assetId)}${fileName}`;
+        const path = `${assetImagePrefix(assetId)}${fileName}`;
         await uploadData({
           path,
           data: file,
@@ -52,7 +80,7 @@ export default function AssetWizardStep2Page() {
 
     ensureAmplifyConfigured();
     const client = generateClient<Schema>();
-    const existingAsset = await client.models.Asset.get({ id: state.assetId });
+    const existingAsset = await client.models.Asset.get({ id: assetId });
     const existingImages = Array.isArray(existingAsset.data?.imageUrls)
       ? existingAsset.data.imageUrls.filter((value): value is string => typeof value === "string")
       : [];
@@ -60,12 +88,20 @@ export default function AssetWizardStep2Page() {
       new Set([...existingImages.map(normalizeStoredPublicPath), ...uploadedPaths]),
     );
     await client.models.Asset.update({
-      id: state.assetId,
+      id: assetId,
       imageUrls: nextImages,
     });
 
     setFiles([]);
-    setToast(`Uploaded ${uploadedPaths.length} file(s).`, "success", 2000);
+    setToast(`Uploaded ${uploadedPaths.length} file(s)`, "success", 2000);
+  }
+
+  function handleSkip() {
+    if (!assetId) {
+      setToast("Missing assetId. Complete Step 1 first.", "danger", 2000);
+      return;
+    }
+    router.push(`/asset-provider/assets/new/step-3?assetId=${assetId}`);
   }
 
   return (
@@ -85,11 +121,7 @@ export default function AssetWizardStep2Page() {
         </FormField>
         <div className="horizontal-stack">
           <Button type="submit">Upload photo</Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => router.push("/asset-provider/assets/new/step-3")}
-          >
+          <Button type="button" variant="ghost" onClick={handleSkip}>
             Continue
           </Button>
         </div>

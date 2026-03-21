@@ -9,6 +9,9 @@ const storageCdnUrl = (() => {
 export const assetImagePrefix = (assetId: string) =>
   `public/assets/${assetId}/images/`;
 
+export const assetDocPrefix = (assetId: string) =>
+  `private/assets/${assetId}/docs/`;
+
 export const blogCoverPrefix = (postId: string) =>
   `public/blog/${postId}/cover/`;
 
