@@ -34,6 +34,12 @@ type AuthContextValue = {
     country?: string;
   }) => Promise<UserProfile | null>;
   resendConfirmationCode: (email: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  confirmPasswordReset: (
+    email: string,
+    code: string,
+    newPassword: string
+  ) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -286,6 +292,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await authClient.resendConfirmationCode(email);
         } catch (nextError) {
           setError(nextError instanceof Error ? nextError.message : "Could not resend confirmation code.");
+          throw nextError;
+        }
+      },
+      requestPasswordReset: async (email) => {
+        setError(null);
+        try {
+          await authClient.requestPasswordReset(email);
+        } catch (nextError) {
+          setError(nextError instanceof Error ? nextError.message : "Reset request failed.");
+          throw nextError;
+        }
+      },
+      confirmPasswordReset: async (email, code, newPassword) => {
+        setError(null);
+        try {
+          await authClient.confirmPasswordReset(email, code, newPassword);
+        } catch (nextError) {
+          setError(nextError instanceof Error ? nextError.message : "Reset failed.");
           throw nextError;
         }
       },

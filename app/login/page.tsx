@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
+import styles from "./page.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function LoginPage() {
   }
 
   return (
-    <SectionContainer>
+    <SectionContainer className={styles.page}>
       <h1>Login</h1>
       <br />
       <Form onSubmit={handleSubmit}>

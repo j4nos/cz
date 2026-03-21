@@ -1,0 +1,13 @@
+.page {
+  min-height: calc(100vh - var(--header-height) - var(--footer-height) - 2.4rem);
+  align-items: center;
+  padding: 1.5rem 0;
+}
+
+@media (max-width: 640px) {
+  .page {
+    min-height: auto;
+    align-items: stretch;
+    padding: 0.5rem 0;
+  }
+}
