@@ -6,14 +6,15 @@ import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
+import { createInvestmentRepository } from "@/src/infrastructure/composition/defaults";
 
 export default function AssetWizardStep1Page() {
   const router = useRouter();
-  const { activeUser, accessToken } = useAuth();
+  const { user } = useAuth();
   const { setToast } = useToast();
   const { state, updateState } = useAssetWizard();
 
-  if (!activeUser) {
+  if (!user) {
     return <p className="muted">Login to create an asset.</p>;
   }
 
@@ -21,39 +22,45 @@ export default function AssetWizardStep1Page() {
     event.preventDefault();
 
     try {
-      if (!accessToken) {
-        setToast("Login required to save asset basics.", "danger", 2500);
-        return;
+      const assetId = state.assetId || crypto.randomUUID();
+      const repository = createInvestmentRepository();
+      const existingAsset = await repository.getAssetById(assetId);
+
+      if (existingAsset && existingAsset.tenantUserId !== user.uid) {
+        throw new Error("You cannot edit another provider's asset.");
       }
 
-      const response = await fetch("/api/assets/draft", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          assetId: state.assetId,
+      const savedAsset = existingAsset
+        ? await repository.updateAsset({
+            ...existingAsset,
+            name: state.name,
+            country: state.country || "France",
+            assetClass: state.assetClass,
+            tokenStandard: state.tokenStandard,
+          })
+        : await repository.createAsset({
+            id: assetId,
+            tenantUserId: user.uid,
           name: state.name,
           country: state.country || "France",
           assetClass: state.assetClass,
           tokenStandard: state.tokenStandard,
-        }),
-      });
-      const result = (await response.json().catch(() => ({}))) as {
-        asset?: { id: string };
-        error?: string;
-      };
+            status: "draft",
+            missingDocsCount: existingAsset?.missingDocsCount ?? 0,
+            imageUrls: existingAsset?.imageUrls ?? [],
+            beneficiaryIban: existingAsset?.beneficiaryIban,
+            beneficiaryLabel: existingAsset?.beneficiaryLabel,
+          });
 
-      if (!response.ok || !result.asset) {
-        throw new Error(result.error || "Failed to save asset basics.");
-      }
-
-      updateState({ assetId: result.asset.id });
+      updateState({ assetId: savedAsset.id });
       router.push("/asset-provider/assets/new/step-2");
     } catch (error) {
       console.error("[asset-step-1] save failed", error);
-      setToast("Failed to save asset basics.", "danger", 2500);
+      setToast(
+        error instanceof Error ? error.message : "Failed to save asset basics.",
+        "danger",
+        2500,
+      );
     }
   }
 

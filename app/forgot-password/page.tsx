@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { SectionContainer } from "@/components/sections/SectionContainer";
+import { AppLink } from "@/components/ui/AppLink";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { useAuth } from "@/contexts/AuthContext";
@@ -134,7 +134,7 @@ export default function ForgotPasswordPage() {
       )}
       <br />
       <p>
-        Back to <Link href="/login">Login</Link>
+        Back to <AppLink href="/login">Login</AppLink>
       </p>
     </SectionContainer>
   );

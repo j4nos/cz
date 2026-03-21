@@ -45,9 +45,11 @@ describe("POST /api/assets/draft", () => {
   });
 
   it("returns 500 when the token is invalid", async () => {
-    verifyAccessToken.mockResolvedValue({});
+    verifyAccessToken.mockRejectedValue(
+      new Error("Invalid login token. Couldn't verify signed token."),
+    );
     const response = await POST(makeRequest({ name: "Asset", country: "HU", assetClass: "REAL_ESTATE" }));
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(500);
   });
 
   it("returns 400 when required fields are missing", async () => {
