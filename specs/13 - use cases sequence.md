@@ -304,44 +304,53 @@ sequenceDiagram
 sequenceDiagram
   participant UI
   participant MintOwnershipAPI as "POST /api/mint-ownership"
-  participant InvestmentRepository
-  participant RequestClaimPort as "DynamoDbRequestClaimGateway"
-  participant OwnershipMintingProcessorService
+  participant VerifyToken as "verifyAccessToken"
+  participant AppSyncGraphQL as "Amplify Data GraphQL"
 
-  UI->>MintOwnershipAPI: { orderId, walletAddress }
-  MintOwnershipAPI->>InvestmentRepository: getOrderById(orderId)
-  InvestmentRepository-->>MintOwnershipAPI: Order
-  MintOwnershipAPI->>InvestmentRepository: getListingById(order.listingId)
-  InvestmentRepository-->>MintOwnershipAPI: Listing
-  alt order.mintedAt exists
+  UI->>MintOwnershipAPI: POST with bearer token + { orderId, walletAddress }
+  MintOwnershipAPI->>VerifyToken: verifyAccessToken(token)
+  VerifyToken-->>MintOwnershipAPI: user payload
+  MintOwnershipAPI->>AppSyncGraphQL: getOrder(id) with Authorization: bearer token
+  AppSyncGraphQL-->>MintOwnershipAPI: Order
+  alt order belongs to another user
+    MintOwnershipAPI-->>UI: 403 Forbidden
+  else order.mintedAt exists
     MintOwnershipAPI-->>UI: { status: "minted" }
   else order.mintRequestedAt exists
     MintOwnershipAPI-->>UI: { status: "pending" }
+  else wallet missing on order
+    MintOwnershipAPI->>AppSyncGraphQL: updateOrder(investorWalletAddress) with Authorization: bearer token
+    AppSyncGraphQL-->>MintOwnershipAPI: Order
+    MintOwnershipAPI->>AppSyncGraphQL: updateOrder(mintRequestedAt) with Authorization: bearer token
+    AppSyncGraphQL-->>MintOwnershipAPI: Order
+    MintOwnershipAPI-->>UI: { status: "queued", mintRequestedAt }
   else no mint started
-    MintOwnershipAPI->>InvestmentRepository: createMintRequestIfMissing({ requestId: "mint:{orderId}", orderId, assetId, idempotencyKey, walletAddress, createdAt })
-    alt existing MintRequest
-      InvestmentRepository-->>MintOwnershipAPI: { request, created: false }
-      alt request.mintStatus == minted
-        MintOwnershipAPI-->>UI: { status: "minted" }
-      else
-        MintOwnershipAPI-->>UI: { status: "pending" }
-      end
-    else new MintRequest created
-      InvestmentRepository-->>MintOwnershipAPI: { request, created: true }
-      MintOwnershipAPI->>OwnershipMintingProcessorService: process({ request, order, listing, asset, walletAddress })
-      OwnershipMintingProcessorService->>RequestClaimPort: claimMintRequest({ requestId, claimedAt })
-      alt claim succeeded
-        RequestClaimPort-->>OwnershipMintingProcessorService: true
-        OwnershipMintingProcessorService->>InvestmentRepository: updateOrder({ mintRequestedAt, mintingAt, investorWalletAddress })
-        OwnershipMintingProcessorService-->>MintOwnershipAPI: { status: "minted" | "pending" }
-        MintOwnershipAPI-->>UI: minted or pending
-      else claim rejected
-        RequestClaimPort-->>OwnershipMintingProcessorService: false
-        OwnershipMintingProcessorService->>InvestmentRepository: getMintRequestById(requestId)
-        MintOwnershipAPI-->>UI: pending or minted
-      end
-    end
+    MintOwnershipAPI->>AppSyncGraphQL: updateOrder(mintRequestedAt) with Authorization: bearer token
+    AppSyncGraphQL-->>MintOwnershipAPI: Order
+    MintOwnershipAPI-->>UI: { status: "queued", mintRequestedAt }
   end
+```
+
+## POST /api/powens/payment-status
+
+```mermaid
+sequenceDiagram
+  participant CallbackPage as "Powens callback UI"
+  participant PaymentStatusAPI as "POST /api/powens/payment-status"
+  participant VerifyToken as "verifyAccessToken"
+  participant AppSyncGraphQL as "Amplify Data GraphQL"
+  participant PowensAPI
+
+  CallbackPage->>PaymentStatusAPI: POST with bearer token + { orderId }
+  PaymentStatusAPI->>VerifyToken: verifyAccessToken(token)
+  VerifyToken-->>PaymentStatusAPI: user payload
+  PaymentStatusAPI->>AppSyncGraphQL: getOrder(id) with Authorization: bearer token
+  AppSyncGraphQL-->>PaymentStatusAPI: Order
+  PaymentStatusAPI->>PowensAPI: GET /payments/{paymentProviderId}
+  PowensAPI-->>PaymentStatusAPI: payment state
+  PaymentStatusAPI->>AppSyncGraphQL: updateOrder(status, paymentProviderStatus) with Authorization: bearer token
+  AppSyncGraphQL-->>PaymentStatusAPI: Order
+  PaymentStatusAPI-->>CallbackPage: { paymentState, orderStatus }
 ```
 
 ## AccountSettingsService.saveProviderSettings

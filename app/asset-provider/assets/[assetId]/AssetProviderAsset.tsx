@@ -49,6 +49,7 @@ export function AssetProviderAsset({ assetId }: Props) {
   const [beneficiaryLabel, setBeneficiaryLabel] = useState("");
   const [savingBasics, setSavingBasics] = useState(false);
   const [deletingAsset, setDeletingAsset] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -82,6 +83,7 @@ export function AssetProviderAsset({ assetId }: Props) {
       return;
     }
 
+    setUploadingPhoto(true);
     try {
       setLoading("asset-provider-asset-upload-photo", true);
       ensureAmplifyConfigured();
@@ -124,6 +126,7 @@ export function AssetProviderAsset({ assetId }: Props) {
     } catch {
       setToast("Failed to upload photo.", "danger", 2500);
     } finally {
+      setUploadingPhoto(false);
       setLoading("asset-provider-asset-upload-photo", false);
     }
   }
@@ -303,7 +306,7 @@ export function AssetProviderAsset({ assetId }: Props) {
           />
         </FormField>
         <Button type="submit" disabled={!photos.length}>
-          Upload
+          {uploadingPhoto ? "Uploading..." : "Upload"}
         </Button>
       </Form>
 

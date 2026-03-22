@@ -60,6 +60,12 @@ async function callGraphQl<T>(
   const json = (await response.json()) as GraphQlResponse<T>;
   if (!response.ok || json.errors?.length) {
     const message = json.errors?.[0]?.message || "GraphQL request failed.";
+    console.error("[assets-submit] GraphQL request failed", {
+      status: response.status,
+      message,
+      variables,
+      errors: json.errors,
+    });
     throw new Error(message);
   }
 
@@ -98,7 +104,6 @@ async function updateAsset(asset: Asset, token: string): Promise<Asset> {
     {
       input: {
         id: asset.id,
-        tenantUserId: asset.tenantUserId,
         name: asset.name,
         country: asset.country,
         assetClass: asset.assetClass,
@@ -131,6 +136,12 @@ export async function POST(request: Request) {
   try {
     const payload = await verifyAccessToken(token);
     const userId = payload.sub as string | undefined;
+    console.info("[assets-submit] verified access token", {
+      sub: userId,
+      tokenUse: payload.token_use,
+      clientId: payload.client_id,
+      username: payload.username,
+    });
     if (!userId) {
       return NextResponse.json({ error: "Invalid token." }, { status: 401 });
     }
@@ -150,23 +161,50 @@ export async function POST(request: Request) {
     const tokenStandard = body.tokenStandard?.trim() || "ERC-20";
 
     if (!assetId || !name || !country || !assetClass) {
+      console.warn("[assets-submit] missing required fields", {
+        assetId,
+        hasName: Boolean(name),
+        hasCountry: Boolean(country),
+        hasAssetClass: Boolean(assetClass),
+      });
       return NextResponse.json(
         { error: "assetId, name, country and assetClass are required." },
         { status: 400 },
       );
     }
 
+    console.info("[assets-submit] loading asset", {
+      assetId,
+      userId,
+      tokenStandard,
+    });
     const asset = await getAssetById(assetId, token);
     if (!asset) {
+      console.warn("[assets-submit] asset not found", { assetId, userId });
       return NextResponse.json({ error: "Asset not found." }, { status: 404 });
     }
 
+    console.info("[assets-submit] loaded asset", {
+      assetId: asset.id,
+      tenantUserId: asset.tenantUserId,
+      status: asset.status,
+      tokenAddress: asset.tokenAddress ?? null,
+    });
     if (asset.tenantUserId !== userId) {
+      console.warn("[assets-submit] forbidden asset access", {
+        assetId: asset.id,
+        tenantUserId: asset.tenantUserId,
+        userId,
+      });
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
 
     let tokenAddress = asset.tokenAddress;
     if (!tokenAddress) {
+      console.info("[assets-submit] tokenizing asset", {
+        assetId,
+        tokenStandard,
+      });
       const gateway = new EthersTokenizationGateway();
       const symbol = name.replace(/\W+/g, "").toUpperCase().slice(0, 6) || "ASSET";
       const tokenization = await gateway.tokenize({
@@ -176,6 +214,10 @@ export async function POST(request: Request) {
         tokenStandard,
       });
       tokenAddress = tokenization.address;
+      console.info("[assets-submit] tokenization completed", {
+        assetId,
+        tokenAddress,
+      });
     }
 
     const savedAsset = await updateAsset(
@@ -192,9 +234,19 @@ export async function POST(request: Request) {
       token,
     );
 
+    console.info("[assets-submit] asset submitted", {
+      assetId: savedAsset.id,
+      status: savedAsset.status,
+      tokenAddress: savedAsset.tokenAddress ?? null,
+    });
+
     return NextResponse.json({ asset: savedAsset });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to submit asset.";
+    console.error("[assets-submit] submit failed", {
+      message,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
-import { generateClient } from "aws-amplify/data";
 
-import type { Schema } from "@/amplify/data/resource";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
+import outputs from "@/amplify_outputs.json";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
 import { getPowensEnv } from "@/src/config/powensEnv";
-import { createPowensPaymentSyncService } from "@/src/infrastructure/composition/defaults";
 
 export const runtime = "nodejs";
 
-const getClient = () => {
-  ensureAmplifyConfigured();
-  return generateClient<Schema>();
-};
+const GRAPHQL_URL = outputs.data?.url || "";
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, "");
 
@@ -25,6 +19,127 @@ type PowensPaymentResponse = {
   error?: string;
   message?: string;
 };
+
+type GraphQlResponse<T> = {
+  data?: T;
+  errors?: Array<{ message?: string }>;
+};
+
+type OrderRecord = {
+  id: string;
+  investorId: string;
+  status: string;
+  paymentProviderId?: string | null;
+  paymentProviderStatus?: string | null;
+};
+
+const orderSelection = `
+  id
+  investorId
+  status
+  paymentProviderId
+  paymentProviderStatus
+`;
+
+const normalizeState = (state?: string) => (state || "").toLowerCase();
+
+const mapPaymentStateToOrderStatus = (state?: string) => {
+  switch (normalizeState(state)) {
+    case "done":
+      return "paid";
+    case "rejected":
+      return "failed";
+    case "cancelled":
+    case "canceled":
+      return "cancelled";
+    case "created":
+    case "pending":
+    case "accepted":
+    case "validating":
+      return "pending";
+    default:
+      return undefined;
+  }
+};
+
+async function callGraphQl<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  token: string,
+): Promise<T> {
+  if (!GRAPHQL_URL) {
+    throw new Error("Missing Amplify Data GraphQL URL.");
+  }
+
+  const response = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token,
+    },
+    body: JSON.stringify({ query, variables }),
+    cache: "no-store",
+  });
+
+  const json = (await response.json()) as GraphQlResponse<T>;
+  if (!response.ok || json.errors?.length) {
+    const message = json.errors?.[0]?.message || "GraphQL request failed.";
+    console.error("[powens] GraphQL request failed", {
+      status: response.status,
+      message,
+      variables,
+      errors: json.errors,
+    });
+    throw new Error(message);
+  }
+
+  if (!json.data) {
+    throw new Error("GraphQL response missing data.");
+  }
+
+  return json.data;
+}
+
+async function getOrderById(orderId: string, token: string): Promise<OrderRecord | null> {
+  const data = await callGraphQl<{ getOrder: OrderRecord | null }>(
+    `
+      query GetOrder($id: ID!) {
+        getOrder(id: $id) {
+          ${orderSelection}
+        }
+      }
+    `,
+    { id: orderId },
+    token,
+  );
+
+  return data.getOrder;
+}
+
+async function updateOrderStatus(
+  orderId: string,
+  status: string,
+  paymentProviderStatus: string,
+  token: string,
+) {
+  await callGraphQl<{ updateOrder: { id: string } | null }>(
+    `
+      mutation UpdateOrder($input: UpdateOrderInput!) {
+        updateOrder(input: $input) {
+          id
+        }
+      }
+    `,
+    {
+      input: {
+        id: orderId,
+        status,
+        paymentProviderStatus,
+      },
+    },
+    token,
+  );
+}
 
 const getPowensTokenUrl = (baseUrl: string) =>
   normalizeBaseUrl(`${baseUrl}/auth/token`);
@@ -81,9 +196,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing orderId." }, { status: 400 });
     }
 
-    const client = getClient();
-    const orderRes = await client.models.Order.get({ id: cleanedOrderId });
-    const order = orderRes.data;
+    const order = await getOrderById(cleanedOrderId, token);
     if (!order) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
@@ -120,15 +233,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const service = createPowensPaymentSyncService();
-    const syncedOrder = await service.syncByOrderId({
-      orderId: order.id,
-      paymentState: paymentData.state,
-    });
+    const nextStatus = mapPaymentStateToOrderStatus(paymentData.state);
+    const resolvedStatus = nextStatus ?? order.status ?? "pending";
+
+    await updateOrderStatus(
+      order.id,
+      resolvedStatus,
+      paymentData.state ?? order.paymentProviderStatus ?? "",
+      token,
+    );
 
     return NextResponse.json({
       paymentState: paymentData.state ?? "",
-      orderStatus: syncedOrder?.status ?? order.status ?? "pending",
+      orderStatus: resolvedStatus,
     });
   } catch (error) {
     console.error("[powens] payment-status failed", error);

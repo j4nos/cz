@@ -64,7 +64,10 @@ const schema = a.schema({
       dueDiligenceRuns: a.hasMany("DueDiligenceRun", "assetId"),
       contractDeploymentRequests: a.hasMany("ContractDeploymentRequest", "assetId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [
+      allow.publicApiKey().to(['read']),
+      allow.ownerDefinedIn("tenantUserId"),
+    ]),
 
   Listing: a
     .model({

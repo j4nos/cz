@@ -207,6 +207,14 @@ export function CreateEditListing({
 
   return (
     <div className="vertical-stack-with-gap">
+      {currentListingId && (
+        <PlainCta
+          title="Listing saved"
+          text={`Listing ID: ${currentListingId}`}
+          actionLabel="View listing details"
+          href={`/listings/${currentListingId}`}
+        />
+      )}
       <h2>{listingId ? "Edit Listing" : "Create Listing"}</h2>
       <Form onSubmit={handleSave}>
         <FormRow columns={2}>

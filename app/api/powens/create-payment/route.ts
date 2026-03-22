@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
-import { generateClient } from "aws-amplify/data";
-
-import type { Schema } from "@/amplify/data/resource";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
+import outputs from "@/amplify_outputs.json";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
 import { getPowensEnv } from "@/src/config/powensEnv";
 import { getAppUrlEnv } from "@/src/config/runtimeEnv";
 
 export const runtime = "nodejs";
 
-const getClient = () => {
-  ensureAmplifyConfigured();
-  return generateClient<Schema>();
-};
+const GRAPHQL_URL = outputs.data?.url || "";
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, "");
 
@@ -42,6 +36,170 @@ type PowensPaymentTokenResponse = {
   error?: string;
   message?: string;
 };
+
+type GraphQlResponse<T> = {
+  data?: T;
+  errors?: Array<{ message?: string }>;
+};
+
+type OrderRecord = {
+  id: string;
+  investorId: string;
+  providerUserId: string;
+  listingId: string;
+  productId: string;
+  total: number;
+  currency: string;
+  paymentProvider?: string | null;
+  paymentProviderId?: string | null;
+  paymentProviderStatus?: string | null;
+};
+
+type ListingRecord = {
+  id: string;
+  assetId: string;
+};
+
+type AssetRecord = {
+  id: string;
+  beneficiaryIban?: string | null;
+  beneficiaryLabel?: string | null;
+};
+
+const orderSelection = `
+  id
+  investorId
+  providerUserId
+  listingId
+  productId
+  total
+  currency
+  paymentProvider
+  paymentProviderId
+  paymentProviderStatus
+`;
+
+const listingSelection = `
+  id
+  assetId
+`;
+
+const assetSelection = `
+  id
+  beneficiaryIban
+  beneficiaryLabel
+`;
+
+async function callGraphQl<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  token: string,
+): Promise<T> {
+  if (!GRAPHQL_URL) {
+    throw new Error("Missing Amplify Data GraphQL URL.");
+  }
+
+  const response = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token,
+    },
+    body: JSON.stringify({ query, variables }),
+    cache: "no-store",
+  });
+
+  const json = (await response.json()) as GraphQlResponse<T>;
+  if (!response.ok || json.errors?.length) {
+    const message = json.errors?.[0]?.message || "GraphQL request failed.";
+    console.error("[powens] GraphQL request failed", {
+      status: response.status,
+      message,
+      variables,
+      errors: json.errors,
+    });
+    throw new Error(message);
+  }
+
+  if (!json.data) {
+    throw new Error("GraphQL response missing data.");
+  }
+
+  return json.data;
+}
+
+async function getOrderById(orderId: string, token: string): Promise<OrderRecord | null> {
+  const data = await callGraphQl<{ getOrder: OrderRecord | null }>(
+    `
+      query GetOrder($id: ID!) {
+        getOrder(id: $id) {
+          ${orderSelection}
+        }
+      }
+    `,
+    { id: orderId },
+    token,
+  );
+
+  return data.getOrder;
+}
+
+async function getListingById(listingId: string, token: string): Promise<ListingRecord | null> {
+  const data = await callGraphQl<{ getListing: ListingRecord | null }>(
+    `
+      query GetListing($id: ID!) {
+        getListing(id: $id) {
+          ${listingSelection}
+        }
+      }
+    `,
+    { id: listingId },
+    token,
+  );
+
+  return data.getListing;
+}
+
+async function getAssetById(assetId: string, token: string): Promise<AssetRecord | null> {
+  const data = await callGraphQl<{ getAsset: AssetRecord | null }>(
+    `
+      query GetAsset($id: ID!) {
+        getAsset(id: $id) {
+          ${assetSelection}
+        }
+      }
+    `,
+    { id: assetId },
+    token,
+  );
+
+  return data.getAsset;
+}
+
+async function updateOrderPayment(
+  orderId: string,
+  paymentProviderId: string,
+  paymentProviderStatus: string,
+  token: string,
+) {
+  await callGraphQl<{ updateOrder: { id: string } | null }>(
+    `
+      mutation UpdateOrder($input: UpdateOrderInput!) {
+        updateOrder(input: $input) {
+          id
+        }
+      }
+    `,
+    {
+      input: {
+        id: orderId,
+        paymentProviderId,
+        paymentProviderStatus,
+      },
+    },
+    token,
+  );
+}
 
 const getPowensTokenUrl = (baseUrl: string) =>
   normalizeBaseUrl(`${baseUrl}/auth/token`);
@@ -132,9 +290,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing orderId." }, { status: 400 });
     }
 
-    const client = getClient();
-    const orderRes = await client.models.Order.get({ id: cleanedOrderId });
-    const order = orderRes.data;
+    const order = await getOrderById(cleanedOrderId, token);
     if (!order) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
@@ -160,8 +316,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const listingRes = await client.models.Listing.get({ id: listingId });
-    const listing = listingRes.data;
+    const listing = await getListingById(listingId, token);
     if (!listing?.assetId) {
       return NextResponse.json(
         { error: "Listing is missing asset." },
@@ -169,8 +324,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const assetRes = await client.models.Asset.get({ id: listing.assetId });
-    const asset = assetRes.data;
+    const asset = await getAssetById(listing.assetId, token);
     if (!asset) {
       return NextResponse.json({ error: "Asset not found." }, { status: 404 });
     }
@@ -248,11 +402,12 @@ export async function POST(request: Request) {
     }
 
     const paymentId = String(paymentData.id);
-    await client.models.Order.update({
-      id: order.id,
-      paymentProviderId: paymentId,
-      paymentProviderStatus: paymentData.state ?? "created",
-    });
+    await updateOrderPayment(
+      order.id,
+      paymentId,
+      paymentData.state ?? "created",
+      token,
+    );
 
     let powensPaymentToken = "";
     try {

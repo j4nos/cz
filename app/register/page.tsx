@@ -12,7 +12,7 @@ import { useToast } from "@/contexts/ToastContext";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, confirmRegistration, login, loading } = useAuth();
+  const { register, confirmRegistration, loading } = useAuth();
   const { setToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,7 +40,6 @@ export default function RegisterPage() {
           role: "INVESTOR",
           country: "HU",
         });
-        await login(email, password);
         router.push("/");
         return;
       }

@@ -35,6 +35,7 @@ function Step2Content() {
   const assetId = searchAssetId || state.assetId || "";
   const { setToast } = useToast();
   const [files, setFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (searchAssetId && searchAssetId !== state.assetId) {
@@ -63,37 +64,42 @@ function Step2Content() {
       return;
     }
 
-    const uploadedPaths = await Promise.all(
-      files.map(async (file, index) => {
-        const fileName = `${Date.now()}-${index}-${toSafeFileName(file.name)}`;
-        const path = `${assetImagePrefix(assetId)}${fileName}`;
-        await uploadData({
-          path,
-          data: file,
-          options: {
-            contentType: file.type || undefined,
-          },
-        }).result;
-        return path;
-      }),
-    );
+    setUploading(true);
+    try {
+      const uploadedPaths = await Promise.all(
+        files.map(async (file, index) => {
+          const fileName = `${Date.now()}-${index}-${toSafeFileName(file.name)}`;
+          const path = `${assetImagePrefix(assetId)}${fileName}`;
+          await uploadData({
+            path,
+            data: file,
+            options: {
+              contentType: file.type || undefined,
+            },
+          }).result;
+          return path;
+        }),
+      );
 
-    ensureAmplifyConfigured();
-    const client = generateClient<Schema>();
-    const existingAsset = await client.models.Asset.get({ id: assetId });
-    const existingImages = Array.isArray(existingAsset.data?.imageUrls)
-      ? existingAsset.data.imageUrls.filter((value): value is string => typeof value === "string")
-      : [];
-    const nextImages = Array.from(
-      new Set([...existingImages.map(normalizeStoredPublicPath), ...uploadedPaths]),
-    );
-    await client.models.Asset.update({
-      id: assetId,
-      imageUrls: nextImages,
-    });
+      ensureAmplifyConfigured();
+      const client = generateClient<Schema>();
+      const existingAsset = await client.models.Asset.get({ id: assetId });
+      const existingImages = Array.isArray(existingAsset.data?.imageUrls)
+        ? existingAsset.data.imageUrls.filter((value): value is string => typeof value === "string")
+        : [];
+      const nextImages = Array.from(
+        new Set([...existingImages.map(normalizeStoredPublicPath), ...uploadedPaths]),
+      );
+      await client.models.Asset.update({
+        id: assetId,
+        imageUrls: nextImages,
+      });
 
-    setFiles([]);
-    setToast(`Uploaded ${uploadedPaths.length} file(s)`, "success", 2000);
+      setFiles([]);
+      setToast(`Uploaded ${uploadedPaths.length} file(s)`, "success", 2000);
+    } finally {
+      setUploading(false);
+    }
   }
 
   function handleSkip() {
@@ -120,7 +126,9 @@ function Step2Content() {
           />
         </FormField>
         <div className="horizontal-stack">
-          <Button type="submit">Upload photo</Button>
+          <Button type="submit" disabled={uploading}>
+            {uploading ? "Uploading..." : "Upload photo"}
+          </Button>
           <Button type="button" variant="ghost" onClick={handleSkip}>
             Continue
           </Button>
