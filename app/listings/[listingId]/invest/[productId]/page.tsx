@@ -7,7 +7,7 @@ type Props = {
 };
 
 export default function InvestorInvestPage({ params, searchParams }: Props) {
-  if (!params?.listingId) {
+  if (!params?.listingId || !params?.productId) {
     notFound();
   }
   const quantityParam = (searchParams?.quantity as string | undefined) ?? undefined;

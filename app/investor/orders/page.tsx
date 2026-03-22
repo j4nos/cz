@@ -40,7 +40,7 @@ export default function InvestorOrdersPage() {
   }, [activeUser]);
 
   if (loading) {
-    return <p className="muted">Loading orders...</p>;
+    return null;
   }
 
   if (!activeUser) {

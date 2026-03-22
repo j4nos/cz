@@ -102,12 +102,7 @@ export function CreateEditListing({
   }, [asset, form, products]);
 
   if (!form) {
-    return (
-      <section>
-        <h1>{listingId ? "Edit listing" : "Create listing"}</h1>
-        <p>Loading listing...</p>
-      </section>
-    );
+    return null;
   }
 
   function updateField<Key extends keyof Listing>(key: Key, value: Listing[Key]) {
@@ -212,14 +207,6 @@ export function CreateEditListing({
 
   return (
     <div className="vertical-stack-with-gap">
-      {currentListingId && (
-        <PlainCta
-          title="Listing saved"
-          text={`Listing ID: ${currentListingId}`}
-          actionLabel="View listing details"
-          href={`/listings/${currentListingId}`}
-        />
-      )}
       <h2>{listingId ? "Edit Listing" : "Create Listing"}</h2>
       <Form onSubmit={handleSave}>
         <FormRow columns={2}>

@@ -151,7 +151,7 @@ export default function UiCatalogPage() {
           title="Create a new asset"
           text="Use this section to highlight high-priority operations like onboarding a new property."
           actionLabel="Create Asset"
-          href="/asset-provider/assets/new/step-1"
+          href="/asset-provider/assets/new/step-1?fresh=1"
         />
       </>
     </div>

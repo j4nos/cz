@@ -5,6 +5,10 @@ import { createPublicContentReader } from "@/src/infrastructure/repositories/cre
 import { InvestorListing } from "./InvestorListing";
 
 export default async function InvestorListingPage({ params }: { params: { listingId: string } }) {
+  if (!params?.listingId) {
+    notFound();
+  }
+
   const { listingWithAsset, products } = await getPublicListingDetails(createPublicContentReader(), params.listingId);
 
   if (!listingWithAsset) {

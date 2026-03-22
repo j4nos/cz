@@ -7,6 +7,10 @@ import { createPublicContentReader } from "@/src/infrastructure/repositories/cre
 export const revalidate = 60;
 
 export default async function BlogDetailsPage({ params }: { params: { blogId: string } }) {
+  if (!params?.blogId) {
+    notFound();
+  }
+
   const post = await getPublicBlogPost(createPublicContentReader(), params.blogId);
 
   if (!post) {

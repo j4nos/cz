@@ -162,19 +162,13 @@ export function PricingEditor({
   }
 
   if (!state) {
-    return (
-      <section>
-        <h1>Pricing tiers</h1>
-        <p>Loading...</p>
-      </section>
-    );
+    return null;
   }
 
   return (
     <div className="vertical-stack-with-gap">
       <header>
         <h1>Pricing tiers</h1>
-        <p className="muted">Listing: {listingId}</p>
       </header>
 
       <section>

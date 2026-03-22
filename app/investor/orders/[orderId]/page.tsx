@@ -5,6 +5,10 @@ import { createPublicContentReader } from "@/src/infrastructure/repositories/cre
 import { InvestorOrder } from "./InvestorOrder";
 
 export default async function InvestorOrderDetailsPage({ params }: { params: { orderId: string } }) {
+  if (!params?.orderId) {
+    notFound();
+  }
+
   const { order, listingWithAsset, product } = await getInvestorOrderEntry(createPublicContentReader(), params.orderId);
 
   if (!order) {

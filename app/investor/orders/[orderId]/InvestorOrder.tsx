@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { KeyValueList } from "@/components/ui/KeyValueList";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,7 +21,6 @@ export function InvestorOrder({
   initialListingWithAsset,
   initialProductName,
 }: Props) {
-  const params = useParams<{ orderId: string }>();
   const { activeUser } = useAuth();
   const [order, setOrder] = useState<Order | null | undefined>(
     initialOrder === undefined ? undefined : initialOrder
@@ -44,12 +42,12 @@ export function InvestorOrder({
       const orders = activeUser
         ? await controller.listOrdersByInvestor(activeUser.uid)
         : [];
-      const next = orders.find((item) => item.id === params.orderId) ?? null;
+      const next = orders.find((item) => item.id === orderId) ?? null;
       setOrder(next);
     }
 
     void load();
-  }, [activeUser, initialOrder, params.orderId]);
+  }, [activeUser, initialOrder, orderId]);
 
   useEffect(() => {
     async function loadRelated() {
@@ -70,20 +68,12 @@ export function InvestorOrder({
 
     void loadRelated();
   }, [fallbackListingTitle, fallbackProductName, order]);
-
   if (order === undefined) {
-    return <p className="muted">Loading order...</p>;
+    return null;
   }
 
   if (!order || (activeUser && order.investorId !== activeUser.uid)) {
-    return (
-      <section className="vertical-stack-with-gap">
-        <h1>Order not found</h1>
-        <p className="muted">
-          The selected order is not available for the current user.
-        </p>
-      </section>
-    );
+    return null;
   }
 
   const resolvedOrder = order;

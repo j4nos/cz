@@ -14,6 +14,10 @@ export async function generateStaticParams() {
 }
 
 export default async function ListingPage({ params }: { params: { listingId: string } }) {
+  if (!params?.listingId) {
+    notFound();
+  }
+
   const reader = createPublicContentReader();
   const [listingWithAsset, products] = await Promise.all([
     reader.getListingWithAssetById(params.listingId),

@@ -29,7 +29,6 @@ export default async function Home() {
   const firstAssetId = settings?.homepageFirstAssetId;
   const secondAssetId = settings?.homepageSecondAssetId;
 
-  let statusMessage: string | null = null;
   let ctaOne: CtaContent | null = null;
   let ctaTwo: CtaContent | null = null;
 
@@ -39,8 +38,6 @@ export default async function Home() {
     !firstAssetId ||
     !secondAssetId
   ) {
-    statusMessage =
-      "Allitsd be a ket CTA asset/listing parost a platform admin feluleten.";
   } else {
     const [firstListingResponse, secondListingResponse, firstAssetResponse, secondAssetResponse] =
       await Promise.all([
@@ -86,7 +83,6 @@ export default async function Home() {
   return (
     <div className="vertical-stack-with-gap">
       <Hero />
-      {statusMessage ? <p className="muted">{statusMessage}</p> : null}
       {ctaOne ? (
         <PhotoCta
           title={ctaOne.title}

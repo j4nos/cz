@@ -1,6 +1,8 @@
 "use client";
 
+import { Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,10 +11,28 @@ import { useAssetWizard } from "@/contexts/asset-wizard-context";
 import { createInvestmentRepository } from "@/src/infrastructure/composition/defaults";
 
 export default function AssetWizardStep1Page() {
+  return (
+    <Suspense fallback={null}>
+      <Step1Content />
+    </Suspense>
+  );
+}
+
+function Step1Content() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { setToast } = useToast();
-  const { state, updateState } = useAssetWizard();
+  const { state, updateState, resetState } = useAssetWizard();
+
+  useEffect(() => {
+    if (searchParams.get("fresh") !== "1") {
+      return;
+    }
+
+    resetState();
+    router.replace("/asset-provider/assets/new/step-1");
+  }, [resetState, router, searchParams]);
 
   if (!user) {
     return <p className="muted">Login to create an asset.</p>;

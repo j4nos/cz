@@ -37,7 +37,7 @@ export default function AssetProviderAssetsPage() {
         title="Create a new asset"
         text="Start the onboarding wizard to add a property."
         actionLabel="Create asset"
-        href="/asset-provider/assets/new/step-1"
+        href="/asset-provider/assets/new/step-1?fresh=1"
       />
       <Table>
         <thead>
