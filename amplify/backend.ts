@@ -19,10 +19,17 @@ export const backend = defineBackend({
   storage,
 });
 
-const webOrigins = (process.env.WEB_ORIGINS ?? "http://localhost:3000,https://localhost:3001")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = Array.from(
+  new Set(
+    [
+      "http://localhost:3000",
+      "https://localhost:3001",
+      process.env.APP_URL ?? "",
+    ]
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  ),
+);
 
 const storageOai = new OriginAccessIdentity(backend.storage.stack, "StorageOai");
 backend.storage.resources.bucket.grantRead(storageOai);
@@ -42,7 +49,7 @@ const storageCdn = new Distribution(backend.storage.stack, "StorageCdn", {
 backend.storage.resources.cfnResources.cfnBucket.corsConfiguration = {
   corsRules: [
     {
-      allowedOrigins: webOrigins,
+      allowedOrigins: allowedOrigins,
       allowedMethods: ["GET", "PUT", "POST", "HEAD"],
       allowedHeaders: ["*"],
       exposedHeaders: ["ETag"],
