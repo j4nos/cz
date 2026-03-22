@@ -9,6 +9,15 @@ frontend:
   phases:
     build:
       commands:
+        - rm -f .env.production
+        - if [ -n "$POLYGON_RPC_URL" ]; then printf "POLYGON_RPC_URL=%s\n" "$POLYGON_RPC_URL" >> .env.production; fi
+        - if [ -n "$PRIVATE_KEY" ]; then printf "PRIVATE_KEY=%s\n" "$PRIVATE_KEY" >> .env.production; fi
+        - if [ -n "$OPENAI_API_KEY" ]; then printf "OPENAI_API_KEY=%s\n" "$OPENAI_API_KEY" >> .env.production; fi
+        - if [ -n "$OPENAI_MODEL" ]; then printf "OPENAI_MODEL=%s\n" "$OPENAI_MODEL" >> .env.production; fi
+        - if [ -n "$APP_URL" ]; then printf "APP_URL=%s\n" "$APP_URL" >> .env.production; fi
+        - if [ -n "$POWENS_DOMAIN" ]; then printf "POWENS_DOMAIN=%s\n" "$POWENS_DOMAIN" >> .env.production; fi
+        - if [ -n "$POWENS_CLIENT_ID" ]; then printf "POWENS_CLIENT_ID=%s\n" "$POWENS_CLIENT_ID" >> .env.production; fi
+        - if [ -n "$POWENS_CLIENT_SECRET" ]; then printf "POWENS_CLIENT_SECRET=%s\n" "$POWENS_CLIENT_SECRET" >> .env.production; fi
         - test -f amplify_outputs.json
         - node -e "const o=require('./amplify_outputs.json'); if(!o?.data?.url){throw new Error('Missing data.url in amplify_outputs.json');} console.log('Using amplify_outputs.json:', o.data.url);"
         - npm run build
