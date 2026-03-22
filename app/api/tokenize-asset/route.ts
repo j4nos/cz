@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
+import { generateClient } from "aws-amplify/data";
 
+import type { Schema } from "@/amplify/data/resource";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
-import { DomainError } from "@/src/domain/value-objects/errors";
-import { createTokenizationService } from "@/src/infrastructure/composition/defaults";
-import { createDomainErrorResponse } from "@/src/infrastructure/http/domainErrorResponse";
+import { EthersTokenizationGateway } from "@/src/infrastructure/gateways/ethersTokenizationGateway";
 
 export const runtime = "nodejs";
+
+function getClient() {
+  ensureAmplifyConfigured();
+  return generateClient<Schema>();
+}
 
 export async function POST(request: Request) {
   try {
@@ -13,8 +19,22 @@ export async function POST(request: Request) {
     const token = authHeader.startsWith("Bearer ")
       ? authHeader.slice("Bearer ".length).trim()
       : "";
+
     if (!token) {
       return NextResponse.json({ error: "Missing bearer token." }, { status: 401 });
+    }
+
+    const { assetId, name, symbol, owner, tokenStandard } = (await request.json()) as {
+      assetId?: string;
+      name?: string;
+      symbol?: string;
+      owner?: string;
+      tokenStandard?: string;
+    };
+
+    const cleanedAssetId = typeof assetId === "string" ? assetId.trim() : "";
+    if (!cleanedAssetId) {
+      return NextResponse.json({ error: "Missing assetId." }, { status: 400 });
     }
 
     const payload = await verifyAccessToken(token);
@@ -23,46 +43,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid token." }, { status: 401 });
     }
 
-    const body = (await request.json()) as {
-      assetId?: string;
-      name?: string;
-      symbol?: string;
-      owner?: string;
-      tokenStandard?: string;
-    };
-
-    const assetId = body.assetId?.trim();
-
-    if (!assetId) {
-      return NextResponse.json({ error: "assetId is required." }, { status: 400 });
+    const client = getClient();
+    const assetRes = await client.models.Asset.get({ id: cleanedAssetId });
+    if (!assetRes.data) {
+      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
     }
 
-    const service = createService();
-    const result = await service.tokenizeAsset({
-      assetId,
-      userId,
-      name: body.name,
-      symbol: body.symbol,
-      owner: body.owner,
-      tokenStandard: body.tokenStandard,
+    if (assetRes.data.tenantUserId !== userId) {
+      return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    }
+
+    const gateway = new EthersTokenizationGateway();
+    const result = await gateway.tokenize({
+      assetId: cleanedAssetId,
+      name: typeof name === "string" ? name : assetRes.data.name,
+      symbol: typeof symbol === "string" ? symbol : "ASSET",
+      owner: typeof owner === "string" ? owner : undefined,
+      tokenStandard:
+        typeof tokenStandard === "string"
+          ? tokenStandard
+          : assetRes.data.tokenStandard ?? undefined,
     });
 
     return NextResponse.json({
       address: result.address,
       standard: result.standard,
       supportsErc721: result.supportsErc721,
-      runId: result.runId,
     });
   } catch (error) {
-    if (error instanceof DomainError) {
-      return createDomainErrorResponse(error);
-    }
-
-    const message = error instanceof Error ? error.message : "Unknown error";
+    const message =
+      error instanceof Error ? error.message : "Failed to deploy token.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
-
-function createService() {
-  return createTokenizationService();
 }

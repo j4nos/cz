@@ -185,84 +185,77 @@ sequenceDiagram
   participant UI
   participant ContractDeploymentService
   participant contractDeploymentRules
-  participant TokenizeAssetAPI
-  participant TokenizationService
-  participant AssetTokenizationRepository
   participant TokenizationGateway
+  participant SubmitAssetAPI as "POST /api/assets/submit"
+  participant AppSyncGraphQL as "Amplify Data GraphQL"
 
   UI->>ContractDeploymentService: submit(input)
   ContractDeploymentService->>contractDeploymentRules: getContractDeploymentError(input)
   alt validation error
     ContractDeploymentService-->>UI: { kind: error }
-  else deploy needed
-    ContractDeploymentService->>TokenizeAssetAPI: deployContract(payload)
-    TokenizeAssetAPI->>TokenizationService: tokenizeAsset(input)
-    TokenizationService->>AssetTokenizationRepository: getAssetById(assetId)
-    TokenizationService->>AssetTokenizationRepository: createContractDeploymentRequestIfMissing({ requestId: "contract-deployment:{assetId}", idempotencyKey, latestRunId })
-    alt existing ContractDeploymentRequest
-      AssetTokenizationRepository-->>TokenizationService: { request, created: false }
-      alt request.tokenAddress exists
-        TokenizationService-->>TokenizeAssetAPI: existing TokenizationResult
-      else request in progress
-        TokenizationService-->>TokenizeAssetAPI: DomainError("Contract deployment already in progress.")
-      end
-    else new ContractDeploymentRequest created
-      AssetTokenizationRepository-->>TokenizationService: { request, created: true }
-      TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitting)
-      TokenizationService->>TokenizationGateway: tokenize(payload)
-      TokenizationGateway-->>TokenizationService: deployed contract
-      TokenizationService->>AssetTokenizationRepository: updateAssetTokenization({ assetId, tokenAddress, latestRunId })
-      TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitted)
-      TokenizationService-->>TokenizeAssetAPI: TokenizationResult
+  else ready to submit
+    ContractDeploymentService->>SubmitAssetAPI: submitAsset(payload, bearerToken)
+    SubmitAssetAPI->>SubmitAssetAPI: verifyAccessToken(token)
+    SubmitAssetAPI->>AppSyncGraphQL: getAsset(id) with Authorization: bearer token
+    AppSyncGraphQL-->>SubmitAssetAPI: Asset
+    alt deploy needed
+      SubmitAssetAPI->>TokenizationGateway: tokenize(payload)
+      TokenizationGateway-->>SubmitAssetAPI: deployed contract
     end
-    TokenizeAssetAPI-->>ContractDeploymentService: address
-    ContractDeploymentService-->>UI: { kind: success, asset }
-  else deploy not needed
+    SubmitAssetAPI->>AppSyncGraphQL: updateAsset(submitted asset) with Authorization: bearer token
+    AppSyncGraphQL-->>SubmitAssetAPI: Asset
     ContractDeploymentService-->>UI: { kind: success, asset }
   end
 ```
 
-## TokenizationService.tokenizeAsset
+## POST /api/assets/submit
 
 ```mermaid
 sequenceDiagram
-  participant TokenizeAssetAPI as "POST /api/tokenize-asset"
-  participant TokenizationService
-  participant AssetTokenizationRepository
-  participant RequestClaimPort as "DynamoDbRequestClaimGateway"
+  participant Step4Page as "Step 4 UI"
+  participant SubmitAssetAPI as "POST /api/assets/submit"
+  participant VerifyToken as "verifyAccessToken"
+  participant AppSyncGraphQL as "Amplify Data GraphQL"
   participant TokenizationGateway
 
-  TokenizeAssetAPI->>TokenizationService: tokenizeAsset(input)
-  TokenizationService->>AssetTokenizationRepository: getAssetById(assetId)
-  AssetTokenizationRepository-->>TokenizationService: Asset
-  alt asset.tokenAddress already exists
-    TokenizationService-->>TokenizeAssetAPI: existing TokenizationResult
-  else no tokenAddress
-    TokenizationService->>AssetTokenizationRepository: createContractDeploymentRequestIfMissing({ requestId: "contract-deployment:{assetId}", idempotencyKey, latestRunId })
-    alt existing request
-      AssetTokenizationRepository-->>TokenizationService: { request, created: false }
-      alt request.tokenAddress exists
-        TokenizationService-->>TokenizeAssetAPI: existing TokenizationResult
-      else request in progress
-        TokenizationService-->>TokenizeAssetAPI: DomainError("Contract deployment already in progress.")
-      end
-    else request created
-      AssetTokenizationRepository-->>TokenizationService: { request, created: true }
-      TokenizationService->>RequestClaimPort: claimContractDeploymentRequest({ requestId, claimedAt })
-      alt claim succeeded
-        RequestClaimPort-->>TokenizationService: true
-        TokenizationService->>TokenizationGateway: tokenize(payload)
-        TokenizationGateway-->>TokenizationService: deployed contract
-        TokenizationService->>AssetTokenizationRepository: updateAssetTokenization({ assetId, tokenAddress, latestRunId })
-        TokenizationService->>AssetTokenizationRepository: updateContractDeploymentRequest(submitted)
-        TokenizationService-->>TokenizeAssetAPI: TokenizationResult
-      else claim rejected
-        RequestClaimPort-->>TokenizationService: false
-        TokenizationService->>AssetTokenizationRepository: getContractDeploymentRequestById(requestId)
-        TokenizationService-->>TokenizeAssetAPI: DomainError("Contract deployment already in progress.")
-      end
-    end
+  Step4Page->>SubmitAssetAPI: POST with bearer token + asset payload
+  SubmitAssetAPI->>VerifyToken: verifyAccessToken(token)
+  VerifyToken-->>SubmitAssetAPI: user payload
+  SubmitAssetAPI->>AppSyncGraphQL: getAsset(id) with Authorization: bearer token
+  AppSyncGraphQL-->>SubmitAssetAPI: Asset
+  alt asset owned by another user
+    SubmitAssetAPI-->>Step4Page: 403 Forbidden
+  else asset already tokenized
+    SubmitAssetAPI->>AppSyncGraphQL: updateAsset(status=submitted)
+    AppSyncGraphQL-->>SubmitAssetAPI: Asset
+    SubmitAssetAPI-->>Step4Page: { asset }
+  else deploy required
+    SubmitAssetAPI->>TokenizationGateway: tokenize(payload)
+    TokenizationGateway-->>SubmitAssetAPI: deployed contract
+    SubmitAssetAPI->>AppSyncGraphQL: updateAsset(tokenAddress, status=submitted)
+    AppSyncGraphQL-->>SubmitAssetAPI: Asset
+    SubmitAssetAPI-->>Step4Page: { asset }
   end
+```
+
+## POST /api/tokenize-asset
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant TokenizeAssetAPI as "POST /api/tokenize-asset"
+  participant VerifyToken as "verifyAccessToken"
+  participant AppSyncGraphQL as "Amplify Data GraphQL"
+  participant TokenizationGateway
+
+  Client->>TokenizeAssetAPI: POST with bearer token
+  TokenizeAssetAPI->>VerifyToken: verifyAccessToken(token)
+  VerifyToken-->>TokenizeAssetAPI: user payload
+  TokenizeAssetAPI->>AppSyncGraphQL: getAsset(id) with Authorization: bearer token
+  AppSyncGraphQL-->>TokenizeAssetAPI: Asset
+  TokenizeAssetAPI->>TokenizationGateway: tokenize(payload)
+  TokenizationGateway-->>TokenizeAssetAPI: deployed contract
+  TokenizeAssetAPI-->>Client: TokenizationResult
 ```
 
 ## OwnershipMintingService.resolveContext

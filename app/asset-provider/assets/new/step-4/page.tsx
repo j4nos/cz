@@ -92,68 +92,38 @@ function Step4Content() {
     setSubmitting(true);
 
     try {
-      let tokenAddress = asset?.tokenAddress;
-
-      if (!tokenAddress) {
-        if (!accessToken) {
-          setToast("Login required to tokenize assets.", "danger", 2500);
-          setSubmitting(false);
-          return;
-        }
-
-        setToast("Deploying asset token...", "warning", 2000);
-        const symbol =
-          nameValue.replace(/\W+/g, "").toUpperCase().slice(0, 6) || "ASSET";
-        const response = await fetch("/api/tokenize-asset", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            assetId: effectiveAssetId,
-            name: nameValue,
-            symbol,
-            tokenStandard: desiredStandard,
-          }),
-        });
-
-        if (!response.ok) {
-          const result = (await response.json().catch(() => ({}))) as { error?: string };
-          throw new Error(result.error || "Token deployment failed. Please try again.");
-        }
-
-        const result = (await response.json()) as { address: string };
-        tokenAddress = result.address;
+      if (!accessToken) {
+        setToast("Login required to submit assets.", "danger", 2500);
+        setSubmitting(false);
+        return;
       }
 
-      const repository = createInvestmentRepository();
-      const baseAsset: Asset = asset
-        ? {
-            ...asset,
-            name: nameValue,
-            country: countryValue,
-            assetClass: assetClassValue,
-            tokenStandard: desiredStandard,
-            missingDocsCount: asset.missingDocsCount ?? 0,
-          }
-        : {
-            id: effectiveAssetId,
-            tenantUserId: user.uid,
-            name: nameValue,
-            country: countryValue,
-            assetClass: assetClassValue,
-            tokenStandard: desiredStandard,
-            status: "draft",
-            missingDocsCount: 0,
-            imageUrls: [],
-          };
-
-      const savedAsset = await repository.updateAsset({
-        ...baseAsset,
-        tokenAddress,
-        status: "submitted",
+      setToast("Submitting asset...", "warning", 2000);
+      const response = await fetch("/api/assets/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          assetId: effectiveAssetId,
+          name: nameValue,
+          country: countryValue,
+          assetClass: assetClassValue,
+          tokenStandard: desiredStandard,
+        }),
       });
+
+      if (!response.ok) {
+        const result = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(result.error || "Failed to submit asset.");
+      }
+
+      const result = (await response.json()) as { asset?: Asset };
+      const savedAsset = result.asset;
+      if (!savedAsset) {
+        throw new Error("Asset submission returned no asset.");
+      }
 
       setAsset(savedAsset);
       resetState();
