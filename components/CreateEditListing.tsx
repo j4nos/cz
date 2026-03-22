@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/Form";
 import { PlainCta } from "@/components/sections/PlainCta";
 import { Table } from "@/components/ui/Table";
+import { useToast } from "@/contexts/ToastContext";
 import { getListingOpenRequirementError } from "@/src/application/use-cases/listingOpenRequirements";
 import type { Asset, Listing, Product } from "@/src/domain/entities";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
@@ -30,9 +30,9 @@ export function CreateEditListing({
   listingId?: string;
 }) {
   const router = useRouter();
+  const { setToast } = useToast();
   const generatedListingId = useMemo(() => listingId ?? `listing-local-${Date.now()}`, [listingId]);
   const [currentListingId, setCurrentListingId] = useState(listingId ?? "");
-  const [statusMessage, setStatusMessage] = useState("");
   const [productsVersion, setProductsVersion] = useState(0);
   const [form, setForm] = useState<Listing | null>(null);
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -125,7 +125,7 @@ export function CreateEditListing({
     }
 
     if (form.saleStatus === "closed" && nextStatus === "open" && missingRequirement) {
-      setStatusMessage(missingRequirement);
+      setToast(missingRequirement, "danger", 2500);
       return;
     }
 
@@ -145,7 +145,7 @@ export function CreateEditListing({
         products,
       });
       if (error) {
-        setStatusMessage(error);
+        setToast(error, "danger", 2500);
         return;
       }
     }
@@ -169,11 +169,11 @@ export function CreateEditListing({
       setCurrentListingId(created.id);
       setForm(created);
       router.replace(`/asset-provider/assets/${assetId}/listings/${created.id}/edit`);
-      setStatusMessage("Listing saved.");
+      setToast("Listing saved.", "success", 2000);
       setProductsVersion((current) => current + 1);
       return;
     }
-    setStatusMessage("Listing saved.");
+    setToast("Listing saved.", "success", 2000);
     setProductsVersion((current) => current + 1);
   }
 
@@ -194,7 +194,7 @@ export function CreateEditListing({
 
     void createListingController().removeProduct(productId);
     setProductsVersion((current) => current + 1);
-    setStatusMessage("Product removed.");
+    setToast("Product removed.", "success", 2000);
     router.push(`/asset-provider/assets/${assetId}/listings/${form.id}/edit`);
   }
 

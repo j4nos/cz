@@ -12,6 +12,7 @@ import {
   FormSelect,
 } from "@/components/ui/Form";
 import { Table } from "@/components/ui/Table";
+import { useToast } from "@/contexts/ToastContext";
 import {
   addPricingTierToState,
   buildPricingTier,
@@ -41,11 +42,14 @@ export function PricingEditor({
   redirectAfterDelete,
 }: Props) {
   const router = useRouter();
+  const currentProductPath = preselectedProductId
+    ? `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${preselectedProductId}`
+    : "";
+  const { setToast } = useToast();
   const [state, setState] = useState<ProductPricingState | null>(null);
   const [minQuantity, setMinQuantity] = useState("1");
   const [discountPercent, setDiscountPercent] = useState("0");
   const [error, setError] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -83,11 +87,12 @@ export function PricingEditor({
       setError("");
       const saved = await createPricingController().savePricingState(state);
       setState(saved);
-      setStatusMessage(saved.productId ? "Product saved." : "Product created.");
+      setToast(saved.productId ? "Product saved." : "Product created.", "success", 2000);
       if (saved.productId) {
-        router.replace(
-          `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${saved.productId}`
-        );
+        const nextProductPath = `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${saved.productId}`;
+        if (nextProductPath !== currentProductPath) {
+          router.replace(nextProductPath);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cannot save product.");
@@ -121,12 +126,12 @@ export function PricingEditor({
     setState((current) => (current ? addPricingTierToState(current, tier) : current));
     setMinQuantity("1");
     setDiscountPercent("0");
-    setStatusMessage("Pricing tier added.");
+    setToast("Pricing tier added.", "success", 2000);
   }
 
   function handleRemoveTier(tierId: string) {
     setState((current) => (current ? removePricingTierFromState(current, tierId) : current));
-    setStatusMessage("Pricing tier removed.");
+    setToast("Pricing tier removed.", "success", 2000);
   }
 
   async function handleDeleteProduct(
@@ -174,7 +179,6 @@ export function PricingEditor({
 
       <section>
         {error ? <p className="muted">{error}</p> : null}
-        {statusMessage ? <p className="muted">{statusMessage}</p> : null}
         <Form onSubmit={handleSave}>
           <FormField label="Name" htmlFor="product-name">
             <FormInput
