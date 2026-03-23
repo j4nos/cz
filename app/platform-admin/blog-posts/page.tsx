@@ -38,10 +38,13 @@ export default function PlatformAdminBlogPostsPage() {
             contentType: file.type || undefined,
           },
         }).result;
-        await client.models.BlogPost.update({
+        const response = await client.models.BlogPost.update({
           id: postId,
           coverImage: path,
-        });
+        }, { authMode: "apiKey" });
+        if (!response.data) {
+          throw new Error(response.errors?.[0]?.message || "Failed to update blog cover image.");
+        }
         return path;
       }),
     [controller],
@@ -67,6 +70,16 @@ export default function PlatformAdminBlogPostsPage() {
     [posts, editingPostId]
   );
 
+  function upsertPost(current: BlogPost[], nextPost: BlogPost) {
+    const existingIndex = current.findIndex((post) => post.id === nextPost.id);
+    if (existingIndex >= 0) {
+      const copy = [...current];
+      copy[existingIndex] = nextPost;
+      return copy;
+    }
+    return [nextPost, ...current];
+  }
+
   async function handleSubmit(values: BlogPostEditorInput, coverFile: File | null) {
     setSaving(true);
     try {
@@ -74,12 +87,20 @@ export default function PlatformAdminBlogPostsPage() {
         values,
         coverFile,
       });
-      await loadPosts();
+      setPosts((current) => upsertPost(current, nextPost));
+      const reloadedPosts = await blogPostAdminService.loadPosts();
+      setPosts(
+        reloadedPosts.some((post) => post.id === nextPost.id)
+          ? reloadedPosts
+          : upsertPost(reloadedPosts, nextPost),
+      );
       setEditingPostId(nextPost.id);
       setToast("Blog post saved", "success", 2000);
     } catch (error) {
       console.error("save blog post failed", error);
-      setToast("Failed to save blog post", "danger", 2400);
+      const message =
+        error instanceof Error ? error.message : "Failed to save blog post";
+      setToast(message, "danger", 3000);
     } finally {
       setSaving(false);
     }

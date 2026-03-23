@@ -18,7 +18,7 @@ export class AmplifyBlogRepository {
     const records = await listAll<Schema["BlogPost"]["type"]>((nextToken) =>
       this.client.models.BlogPost.list({
         filter: { status: { eq: "published" } },
-        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+        authMode: this.readAuthMode ?? "apiKey",
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -28,7 +28,7 @@ export class AmplifyBlogRepository {
   async listBlogPosts(): Promise<BlogPost[]> {
     const records = await listAll<Schema["BlogPost"]["type"]>((nextToken) =>
       this.client.models.BlogPost.list({
-        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+        authMode: "apiKey",
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -36,7 +36,7 @@ export class AmplifyBlogRepository {
   }
 
   async saveBlogPost(blogPost: BlogPost): Promise<BlogPost> {
-    const existing = await this.client.models.BlogPost.get({ id: blogPost.id });
+    const existing = await this.client.models.BlogPost.get({ id: blogPost.id }, { authMode: "apiKey" });
     const payload = {
       id: blogPost.id,
       title: blogPost.title,
@@ -49,15 +49,21 @@ export class AmplifyBlogRepository {
     };
 
     if (existing.data) {
-      await this.client.models.BlogPost.update(payload);
+      const response = await this.client.models.BlogPost.update(payload, { authMode: "apiKey" });
+      if (!response.data) {
+        throw new Error(response.errors?.[0]?.message || "Failed to update blog post.");
+      }
     } else {
-      await this.client.models.BlogPost.create(payload);
+      const response = await this.client.models.BlogPost.create(payload, { authMode: "apiKey" });
+      if (!response.data) {
+        throw new Error(response.errors?.[0]?.message || "Failed to create blog post.");
+      }
     }
 
     return blogPost;
   }
 
   async deleteBlogPost(blogId: string): Promise<void> {
-    await this.client.models.BlogPost.delete({ id: blogId });
+    await this.client.models.BlogPost.delete({ id: blogId }, { authMode: "apiKey" });
   }
 }

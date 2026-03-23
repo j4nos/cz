@@ -231,7 +231,7 @@ const schema = a.schema({
       updatedByUserId: a.id().required(),
       updatedAt: a.datetime(),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.publicApiKey()]),
 
   BlogPost: a
     .model({
@@ -243,10 +243,7 @@ const schema = a.schema({
       publishedAt: a.datetime(),
       updatedAt: a.datetime(),
     })
-    .authorization((allow) => [
-      allow.publicApiKey().to(['read']),
-      allow.groups(['admin']),
-    ]),
+    .authorization((allow) => [allow.publicApiKey()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

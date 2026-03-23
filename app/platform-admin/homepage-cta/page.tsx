@@ -27,7 +27,7 @@ export default function PlatformAdminHomepageCtaPage() {
     async function load() {
       const { data } = await client.models.PlatformSettings.get({
         id: "homepage",
-      });
+      }, { authMode: "apiKey" });
       if (data?.homepageFirstAssetId) {
         setFirstAssetId(data.homepageFirstAssetId);
       }
@@ -50,7 +50,7 @@ export default function PlatformAdminHomepageCtaPage() {
 
     const existing = await client.models.PlatformSettings.get({
       id: "homepage",
-    });
+    }, { authMode: "apiKey" });
 
     if (existing.data) {
       const user = await getCurrentUser();
@@ -62,7 +62,7 @@ export default function PlatformAdminHomepageCtaPage() {
         homepageSecondListingId: secondListingId,
         updatedByUserId: user.username,
         updatedAt: new Date().toISOString(),
-      });
+      }, { authMode: "apiKey" });
     } else {
       const user = await getCurrentUser();
       await client.models.PlatformSettings.create({
@@ -73,7 +73,7 @@ export default function PlatformAdminHomepageCtaPage() {
         homepageSecondListingId: secondListingId,
         updatedByUserId: user.username,
         updatedAt: new Date().toISOString(),
-      });
+      }, { authMode: "apiKey" });
     }
 
     setToast("Setting saved", "success", 2000);

@@ -41,10 +41,10 @@ export default async function Home() {
   } else {
     const [firstListingResponse, secondListingResponse, firstAssetResponse, secondAssetResponse] =
       await Promise.all([
-        client.models.Listing.get({ id: firstListingId }),
-        client.models.Listing.get({ id: secondListingId }),
-        client.models.Asset.get({ id: firstAssetId }),
-        client.models.Asset.get({ id: secondAssetId }),
+        client.models.Listing.get({ id: firstListingId }, { authMode: "apiKey" }),
+        client.models.Listing.get({ id: secondListingId }, { authMode: "apiKey" }),
+        client.models.Asset.get({ id: firstAssetId }, { authMode: "apiKey" }),
+        client.models.Asset.get({ id: secondAssetId }, { authMode: "apiKey" }),
       ]);
     const firstListing = firstListingResponse.data;
     const secondListing = secondListingResponse.data;
