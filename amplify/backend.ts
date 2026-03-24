@@ -19,6 +19,18 @@ export const backend = defineBackend({
   storage,
 });
 
+const authEnvironmentName = (process.env.AWS_BRANCH ?? "local")
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9-]/g, "-")
+  .replace(/-+/g, "-")
+  .replace(/^-|-$/g, "");
+
+backend.auth.resources.cfnResources.cfnUserPool.userPoolName =
+  `cityzeen-${authEnvironmentName || "local"}-user-pool`;
+backend.auth.resources.cfnResources.cfnUserPoolClient.clientName =
+  `cityzeen-${authEnvironmentName || "local"}-user-pool-client`;
+
 const allowedOrigins = Array.from(
   new Set(
     [
