@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Carousel } from "@/components/ui/Carousel";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { Table } from "@/components/ui/Table";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLoading } from "@/contexts/LoadingContext";
 import { useToast } from "@/contexts/ToastContext";
 import {
@@ -37,6 +38,7 @@ type Props = {
 
 export function AssetProviderAsset({ assetId }: Props) {
   const router = useRouter();
+  const { accessToken } = useAuth();
   const { setLoading } = useLoading();
   const { setToast } = useToast();
   const [asset, setAsset] = useState<AssetView | null | undefined>(undefined);
@@ -159,6 +161,14 @@ export function AssetProviderAsset({ assetId }: Props) {
         })
       );
       setAsset(updated as AssetView);
+      await fetch("/api/asset-provider/revalidate-listings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ listingIds: assetListings.map((listing) => listing.id) }),
+      });
       setToast("Asset basics updated.", "success");
     } catch {
       setToast("Failed to update asset basics.", "danger");

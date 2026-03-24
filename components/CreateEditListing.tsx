@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/Form";
 import { PlainCta } from "@/components/sections/PlainCta";
 import { Table } from "@/components/ui/Table";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { getListingOpenRequirementError } from "@/src/application/use-cases/listingOpenRequirements";
 import type { Asset, Listing, Product } from "@/src/domain/entities";
@@ -30,6 +31,7 @@ export function CreateEditListing({
   listingId?: string;
 }) {
   const router = useRouter();
+  const { accessToken } = useAuth();
   const { setToast } = useToast();
   const generatedListingId = useMemo(() => listingId ?? `listing-local-${Date.now()}`, [listingId]);
   const [currentListingId, setCurrentListingId] = useState(listingId ?? "");
@@ -150,6 +152,14 @@ export function CreateEditListing({
     if (listingId) {
       const saved = await controller.saveListingDraft(form);
       setCurrentListingId(saved.id);
+      await fetch("/api/asset-provider/revalidate-listings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ listingId: saved.id }),
+      });
     } else {
       const created = await controller.createListingDraft({
         assetId: form.assetId,
@@ -163,6 +173,14 @@ export function CreateEditListing({
       });
       setCurrentListingId(created.id);
       setForm(created);
+      await fetch("/api/asset-provider/revalidate-listings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ listingId: created.id }),
+      });
       router.replace(`/asset-provider/assets/${assetId}/listings/${created.id}/edit`);
       setToast("Listing saved.", "success", 2000);
       setProductsVersion((current) => current + 1);
@@ -179,6 +197,14 @@ export function CreateEditListing({
     }
 
     void createListingController().deleteListing(form.id);
+    void fetch("/api/asset-provider/revalidate-listings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ listingId: form.id }),
+    });
     router.push(`/asset-provider/assets/${assetId}`);
   }
 

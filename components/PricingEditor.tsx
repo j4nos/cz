@@ -12,6 +12,7 @@ import {
   FormSelect,
 } from "@/components/ui/Form";
 import { Table } from "@/components/ui/Table";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import {
   addPricingTierToState,
@@ -42,6 +43,7 @@ export function PricingEditor({
   redirectAfterDelete,
 }: Props) {
   const router = useRouter();
+  const { accessToken } = useAuth();
   const currentProductPath = preselectedProductId
     ? `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${preselectedProductId}`
     : "";
@@ -87,6 +89,14 @@ export function PricingEditor({
       setError("");
       const saved = await createPricingController().savePricingState(state);
       setState(saved);
+      await fetch("/api/asset-provider/revalidate-listings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ listingId }),
+      });
       setToast(saved.productId ? "Product saved." : "Product created.", "success", 2000);
       if (saved.productId) {
         const nextProductPath = `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${saved.productId}`;
@@ -152,6 +162,14 @@ export function PricingEditor({
     try {
       setError("");
       await createPricingController().deleteProduct(state.productId);
+      await fetch("/api/asset-provider/revalidate-listings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ listingId }),
+      });
       router.push(
         redirectAfterDelete ??
           `/asset-provider/assets/${assetId}/listings/${listingId}/edit`

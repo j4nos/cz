@@ -21,7 +21,7 @@ import { createBlogAdminController } from "@/src/infrastructure/controllers/crea
 import { blogCoverPrefix, toSafeFileName } from "@/src/infrastructure/storage/publicUrls";
 
 export default function PlatformAdminBlogPostsPage() {
-  const { loading, isAuthenticated, isAdmin } = useAuth();
+  const { loading, isAuthenticated, isAdmin, accessToken } = useAuth();
   const { setToast } = useToast();
   const controller = useMemo(() => createBlogAdminController(), []);
   const blogPostAdminService = useMemo(
@@ -41,7 +41,7 @@ export default function PlatformAdminBlogPostsPage() {
         const response = await client.models.BlogPost.update({
           id: postId,
           coverImage: path,
-        }, { authMode: "apiKey" });
+        });
         if (!response.data) {
           throw new Error(response.errors?.[0]?.message || "Failed to update blog cover image.");
         }
@@ -94,6 +94,10 @@ export default function PlatformAdminBlogPostsPage() {
           ? reloadedPosts
           : upsertPost(reloadedPosts, nextPost),
       );
+      await fetch("/api/platform-admin/revalidate-blog", {
+        method: "POST",
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
       setEditingPostId(nextPost.id);
       setToast("Blog post saved", "success", 2000);
     } catch (error) {
@@ -114,6 +118,10 @@ export default function PlatformAdminBlogPostsPage() {
         setEditingPostId(null);
       }
       await loadPosts();
+      await fetch("/api/platform-admin/revalidate-blog", {
+        method: "POST",
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
       setToast("Blog post deleted", "success", 1800);
     } catch (error) {
       console.error("delete blog post failed", error);

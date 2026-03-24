@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import type { AuthUser } from "@/src/application/interfaces/authClient";
 import type { UserProfile } from "@/src/domain/entities";
+import { CheckIsAdminUserUseCase } from "@/src/application/use-cases/CheckIsAdminUserUseCase";
 import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
 
 type AuthContextValue = {
@@ -48,10 +49,12 @@ const ANON_KEY = "cityzeen:anon-user-id";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const authClient = useMemo(() => createAuthClient(), []);
+  const checkIsAdminUseCase = useMemo(() => new CheckIsAdminUserUseCase(), []);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [anonUser, setAnonUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(nextUser);
     await loadProfile(nextUser);
     setAccessToken(await authClient.getAccessToken());
+    setIsAdmin(nextUser ? await checkIsAdminUseCase.execute() : false);
   }
 
   async function claimAnonymousSession(toUserId: string) {
@@ -177,8 +181,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [authClient]);
 
-  const isAdmin = profile?.role === "platform-admin";
-
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -202,6 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(nextUser);
           setProfile(nextProfile);
           setAccessToken(await authClient.getAccessToken());
+          setIsAdmin(await checkIsAdminUseCase.execute());
           await claimAnonymousSession(nextUser.uid);
           return nextProfile;
         } catch (nextError) {
@@ -258,6 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(nextUser);
           setProfile(nextProfile);
           setAccessToken(await authClient.getAccessToken());
+          setIsAdmin(await checkIsAdminUseCase.execute());
           await claimAnonymousSession(nextUser.uid);
           return nextProfile;
         } catch (nextError) {
@@ -302,6 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           setProfile(null);
           setAccessToken(null);
+          setIsAdmin(false);
         } finally {
           setLoading(false);
         }
@@ -310,7 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await loadProfile(authClient.getCurrentUser());
       },
     }),
-    [accessToken, anonUser, authClient, error, isAdmin, loading, profile, user],
+    [accessToken, anonUser, authClient, checkIsAdminUseCase, error, isAdmin, loading, profile, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 
@@ -12,7 +12,7 @@ import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function PlatformAdminHomepageCtaPage() {
-  const { isAuthenticated, loading, isAdmin } = useAuth();
+  const { isAuthenticated, loading, isAdmin, accessToken } = useAuth();
   const client = useMemo(() => {
     ensureAmplifyConfigured();
     return generateClient<Schema>();
@@ -23,60 +23,65 @@ export default function PlatformAdminHomepageCtaPage() {
   const [secondListingId, setSecondListingId] = useState("");
   const { setToast } = useToast();
 
-  useEffect(() => {
-    async function load() {
-      const { data } = await client.models.PlatformSettings.get({
+  const loadSettings = useCallback(async () => {
+    const { data } = await client.models.PlatformSettings.get(
+      {
         id: "homepage",
-      }, { authMode: "apiKey" });
-      if (data?.homepageFirstAssetId) {
-        setFirstAssetId(data.homepageFirstAssetId);
-      }
-      if (data?.homepageFirstListingId) {
-        setFirstListingId(data.homepageFirstListingId);
-      }
-      if (data?.homepageSecondAssetId) {
-        setSecondAssetId(data.homepageSecondAssetId);
-      }
-      if (data?.homepageSecondListingId) {
-        setSecondListingId(data.homepageSecondListingId);
-      }
-    }
-
-    void load();
+      },
+      { authMode: "apiKey" },
+    );
+    setFirstAssetId(data?.homepageFirstAssetId ?? "");
+    setFirstListingId(data?.homepageFirstListingId ?? "");
+    setSecondAssetId(data?.homepageSecondAssetId ?? "");
+    setSecondListingId(data?.homepageSecondListingId ?? "");
   }, [client]);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const existing = await client.models.PlatformSettings.get({
-      id: "homepage",
-    }, { authMode: "apiKey" });
+    try {
+      const existing = await client.models.PlatformSettings.get(
+        {
+          id: "homepage",
+        },
+        { authMode: "apiKey" },
+      );
+      const user = await getCurrentUser();
+      const payload = {
+        id: "homepage",
+        homepageFirstAssetId: firstAssetId,
+        homepageFirstListingId: firstListingId,
+        homepageSecondAssetId: secondAssetId,
+        homepageSecondListingId: secondListingId,
+        updatedByUserId: user.username,
+        updatedAt: new Date().toISOString(),
+      };
 
-    if (existing.data) {
-      const user = await getCurrentUser();
-      await client.models.PlatformSettings.update({
-        id: "homepage",
-        homepageFirstAssetId: firstAssetId,
-        homepageFirstListingId: firstListingId,
-        homepageSecondAssetId: secondAssetId,
-        homepageSecondListingId: secondListingId,
-        updatedByUserId: user.username,
-        updatedAt: new Date().toISOString(),
-      }, { authMode: "apiKey" });
-    } else {
-      const user = await getCurrentUser();
-      await client.models.PlatformSettings.create({
-        id: "homepage",
-        homepageFirstAssetId: firstAssetId,
-        homepageFirstListingId: firstListingId,
-        homepageSecondAssetId: secondAssetId,
-        homepageSecondListingId: secondListingId,
-        updatedByUserId: user.username,
-        updatedAt: new Date().toISOString(),
-      }, { authMode: "apiKey" });
+      const response = existing.data
+        ? await client.models.PlatformSettings.update(payload)
+        : await client.models.PlatformSettings.create(payload);
+
+      if (!response.data) {
+        throw new Error(response.errors?.[0]?.message || "Failed to save homepage CTA settings.");
+      }
+
+      await loadSettings();
+      await fetch("/api/platform-admin/revalidate-homepage", {
+        method: "POST",
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+
+      setToast("Setting saved", "success", 2000);
+    } catch (error) {
+      console.error("save homepage CTA failed", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to save homepage CTA settings.";
+      setToast(message, "danger", 3000);
     }
-
-    setToast("Setting saved", "success", 2000);
   }
 
   if (loading) {

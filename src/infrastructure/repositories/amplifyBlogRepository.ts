@@ -28,7 +28,7 @@ export class AmplifyBlogRepository {
   async listBlogPosts(): Promise<BlogPost[]> {
     const records = await listAll<Schema["BlogPost"]["type"]>((nextToken) =>
       this.client.models.BlogPost.list({
-        authMode: "apiKey",
+        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -36,7 +36,7 @@ export class AmplifyBlogRepository {
   }
 
   async saveBlogPost(blogPost: BlogPost): Promise<BlogPost> {
-    const existing = await this.client.models.BlogPost.get({ id: blogPost.id }, { authMode: "apiKey" });
+    const existing = await this.client.models.BlogPost.get({ id: blogPost.id });
     const payload = {
       id: blogPost.id,
       title: blogPost.title,
@@ -49,12 +49,12 @@ export class AmplifyBlogRepository {
     };
 
     if (existing.data) {
-      const response = await this.client.models.BlogPost.update(payload, { authMode: "apiKey" });
+      const response = await this.client.models.BlogPost.update(payload);
       if (!response.data) {
         throw new Error(response.errors?.[0]?.message || "Failed to update blog post.");
       }
     } else {
-      const response = await this.client.models.BlogPost.create(payload, { authMode: "apiKey" });
+      const response = await this.client.models.BlogPost.create(payload);
       if (!response.data) {
         throw new Error(response.errors?.[0]?.message || "Failed to create blog post.");
       }
@@ -64,6 +64,6 @@ export class AmplifyBlogRepository {
   }
 
   async deleteBlogPost(blogId: string): Promise<void> {
-    await this.client.models.BlogPost.delete({ id: blogId }, { authMode: "apiKey" });
+    await this.client.models.BlogPost.delete({ id: blogId });
   }
 }

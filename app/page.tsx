@@ -14,8 +14,6 @@ type CtaContent = {
   reverse?: boolean;
 };
 
-export const revalidate = 60;
-
 export default async function Home() {
   ensureAmplifyConfigured();
   const client = generateClient<Schema>();
