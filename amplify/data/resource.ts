@@ -19,7 +19,7 @@ const schema = a.schema({
       documentUploads: a.hasMany("DocumentMeta", "uploadedByUserId"),
       threads: a.hasMany("UserThread", "userId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.ownerDefinedIn("id")]),
 
   UserThread: a
     .model({
@@ -30,7 +30,7 @@ const schema = a.schema({
       user: a.belongsTo("UserProfile", "userId"),
       messages: a.hasMany("UserMessage", "threadId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.ownerDefinedIn("userId")]),
 
   UserMessage: a
     .model({
@@ -42,7 +42,7 @@ const schema = a.schema({
       thread: a.belongsTo("UserThread", "threadId"),
       user: a.belongsTo("UserProfile", "userId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.ownerDefinedIn("userId")]),
 
   Asset: a
     .model({
@@ -86,7 +86,10 @@ const schema = a.schema({
       products: a.hasMany("Product", "listingId"),
       orders: a.hasMany("Order", "listingId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [
+      allow.ownerDefinedIn("investorId"),
+      allow.ownerDefinedIn("providerUserId"),
+    ]),
 
   Product: a
     .model({

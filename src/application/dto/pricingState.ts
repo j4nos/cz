@@ -1,4 +1,4 @@
-import type { Product, ProductCoupon } from "@/src/domain/entities";
+import type { EligibleInvestorType, Product, ProductCoupon } from "@/src/domain/entities";
 
 export interface PricingTier {
   id: string;
@@ -14,7 +14,7 @@ export interface ProductPricingState {
   unitPrice: number;
   minPurchase: number;
   maxPurchase: number;
-  eligibleInvestorType: string;
+  eligibleInvestorType: EligibleInvestorType;
   supplyTotal: number;
   tiers: PricingTier[];
   coupons: ProductCoupon[];

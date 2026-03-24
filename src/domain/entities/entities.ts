@@ -1,4 +1,6 @@
 export type UserRole = "ASSET_PROVIDER" | "INVESTOR" | "platform-admin";
+export type InvestorType = "RETAIL" | "PROFESSIONAL";
+export type EligibleInvestorType = InvestorType | "ANY";
 
 export type KycStatus =
   | "not-started"
@@ -25,7 +27,7 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   country: string;
-  investorType?: string;
+  investorType?: InvestorType;
   companyName?: string;
   kycStatus: KycStatus;
   createdAt: string;
@@ -70,7 +72,7 @@ export interface Product {
   unitPrice: number;
   minPurchase: number;
   maxPurchase: number;
-  eligibleInvestorType: string;
+  eligibleInvestorType: EligibleInvestorType;
   supplyTotal: number;
   remainingSupply: number;
   coupons: ProductCoupon[];

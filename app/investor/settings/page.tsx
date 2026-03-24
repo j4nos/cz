@@ -7,6 +7,7 @@ import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { AccountSettingsService } from "@/src/application/use-cases/accountSettingsService";
+import type { InvestorType } from "@/src/domain/entities";
 import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
 
 export default function InvestorSettingsPage() {
@@ -33,14 +34,14 @@ export default function InvestorSettingsPage() {
     [],
   );
   const [country, setCountry] = useState(profile?.country ?? "");
-  const [investorType, setInvestorType] = useState(
-    profile?.investorType ?? "retail"
+  const [investorType, setInvestorType] = useState<InvestorType>(
+    profile?.investorType ?? "RETAIL"
   );
   const [companyName, setCompanyName] = useState(profile?.companyName ?? "");
 
   useEffect(() => {
     setCountry(profile?.country ?? "");
-    setInvestorType(profile?.investorType ?? "retail");
+    setInvestorType(profile?.investorType ?? "RETAIL");
     setCompanyName(profile?.companyName ?? "");
   }, [profile]);
 
@@ -104,10 +105,10 @@ export default function InvestorSettingsPage() {
               id="settings-investor-type"
               value={investorType}
               options={[
-                { value: "retail", label: "Retail" },
-                { value: "accredited", label: "Accredited" },
+                { value: "RETAIL", label: "Retail" },
+                { value: "PROFESSIONAL", label: "Professional" },
               ]}
-              onChange={(event) => setInvestorType(event.target.value)}
+              onChange={(event) => setInvestorType(event.target.value as InvestorType)}
             />
           </FormField>
           <FormField label="Company name" htmlFor="settings-company">

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getCurrentUser } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 
 import { Button } from "@/components/ui/Button";
@@ -12,7 +11,7 @@ import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function PlatformAdminHomepageCtaPage() {
-  const { isAuthenticated, loading, isAdmin, accessToken } = useAuth();
+  const { user, isAuthenticated, loading, isAdmin, accessToken } = useAuth();
   const client = useMemo(() => {
     ensureAmplifyConfigured();
     return generateClient<Schema>();
@@ -24,21 +23,27 @@ export default function PlatformAdminHomepageCtaPage() {
   const { setToast } = useToast();
 
   const loadSettings = useCallback(async () => {
+    if (!isAuthenticated || !isAdmin) {
+      return;
+    }
+
     const { data } = await client.models.PlatformSettings.get(
       {
         id: "homepage",
       },
-      { authMode: "apiKey" },
+      { authMode: "userPool" },
     );
     setFirstAssetId(data?.homepageFirstAssetId ?? "");
     setFirstListingId(data?.homepageFirstListingId ?? "");
     setSecondAssetId(data?.homepageSecondAssetId ?? "");
     setSecondListingId(data?.homepageSecondListingId ?? "");
-  }, [client]);
+  }, [client, isAdmin, isAuthenticated]);
 
   useEffect(() => {
-    void loadSettings();
-  }, [loadSettings]);
+    if (!loading && isAuthenticated && isAdmin) {
+      void loadSettings();
+    }
+  }, [isAdmin, isAuthenticated, loadSettings, loading]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,22 +53,21 @@ export default function PlatformAdminHomepageCtaPage() {
         {
           id: "homepage",
         },
-        { authMode: "apiKey" },
+        { authMode: "userPool" },
       );
-      const user = await getCurrentUser();
       const payload = {
         id: "homepage",
         homepageFirstAssetId: firstAssetId,
         homepageFirstListingId: firstListingId,
         homepageSecondAssetId: secondAssetId,
         homepageSecondListingId: secondListingId,
-        updatedByUserId: user.username,
+        updatedByUserId: user?.uid ?? "",
         updatedAt: new Date().toISOString(),
       };
 
       const response = existing.data
-        ? await client.models.PlatformSettings.update(payload)
-        : await client.models.PlatformSettings.create(payload);
+        ? await client.models.PlatformSettings.update(payload, { authMode: "userPool" })
+        : await client.models.PlatformSettings.create(payload, { authMode: "userPool" });
 
       if (!response.data) {
         throw new Error(response.errors?.[0]?.message || "Failed to save homepage CTA settings.");

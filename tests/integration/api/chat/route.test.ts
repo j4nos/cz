@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sendMessage, listThreads, listMessages } = vi.hoisted(() => ({
+const { sendMessage, listThreads, listMessages, verifyAccessToken, parseAnonCookieValue } = vi.hoisted(() => ({
   sendMessage: vi.fn(),
   listThreads: vi.fn(),
   listMessages: vi.fn(),
+  verifyAccessToken: vi.fn(),
+  parseAnonCookieValue: vi.fn(),
 }));
 
 vi.mock("@/src/application/use-cases/chatService", () => ({
@@ -16,6 +18,11 @@ vi.mock("@/src/application/use-cases/chatService", () => ({
 }));
 vi.mock("@/src/infrastructure/repositories/amplifyChatRepository", () => ({ AmplifyChatRepository: class {} }));
 vi.mock("@/src/infrastructure/gateways/ruleBasedChatGateway", () => ({ RuleBasedChatGateway: class {} }));
+vi.mock("@/src/infrastructure/auth/verifyAccessToken", () => ({ verifyAccessToken }));
+vi.mock("@/src/infrastructure/auth/anonSession", () => ({
+  getAnonCookieName: () => "cityzeen-anon",
+  parseAnonCookieValue,
+}));
 
 import { GET, POST } from "@/app/api/chat/route";
 
@@ -28,13 +35,15 @@ describe("/api/chat route", () => {
     });
     listThreads.mockReset().mockResolvedValue([{ threadId: "thread-1", userId: "user-1" }]);
     listMessages.mockReset().mockResolvedValue([{ id: "m1", threadId: "thread-1" }]);
+    verifyAccessToken.mockReset().mockResolvedValue({ sub: "user-1" });
+    parseAnonCookieValue.mockReset().mockReturnValue({ userId: "anon-1" });
   });
 
   it("returns 400 for missing POST input", async () => {
     const response = await POST(
       new Request("http://localhost/api/chat", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", authorization: "Bearer token" },
         body: JSON.stringify({ threadId: "", userId: "user-1", input: "hi" }),
       }),
     );
@@ -45,7 +54,7 @@ describe("/api/chat route", () => {
     const response = await POST(
       new Request("http://localhost/api/chat", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", authorization: "Bearer token" },
         body: JSON.stringify({ threadId: "thread-1", userId: "user-1", input: "hi" }),
       }),
     );
@@ -64,16 +73,50 @@ describe("/api/chat route", () => {
   });
 
   it("returns threads for listThreads=1", async () => {
-    const response = await GET(new Request("http://localhost/api/chat?userId=user-1&listThreads=1"));
+    const response = await GET(
+      new Request("http://localhost/api/chat?userId=user-1&listThreads=1", {
+        headers: { authorization: "Bearer token" },
+      }),
+    );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ threads: [{ threadId: "thread-1", userId: "user-1" }] });
   });
 
   it("returns messages for thread lookup", async () => {
-    const response = await GET(new Request("http://localhost/api/chat?userId=user-1&threadId=thread-1"));
+    const response = await GET(
+      new Request("http://localhost/api/chat?userId=user-1&threadId=thread-1", {
+        headers: { authorization: "Bearer token" },
+      }),
+    );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ messages: [{ id: "m1", threadId: "thread-1" }] });
+  });
+
+  it("returns 401 when auth is missing", async () => {
+    const response = await GET(new Request("http://localhost/api/chat?userId=user-1&listThreads=1"));
+    expect(response.status).toBe(401);
+  });
+
+  it("allows anonymous chat only for the matching cookie user", async () => {
+    const response = await GET(
+      new Request("http://localhost/api/chat?userId=anon-1&listThreads=1", {
+        headers: { cookie: "cityzeen-anon=value" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it("returns 403 when bearer token belongs to another user", async () => {
+    verifyAccessToken.mockResolvedValue({ sub: "other-user" });
+    const response = await GET(
+      new Request("http://localhost/api/chat?userId=user-1&listThreads=1", {
+        headers: { authorization: "Bearer token" },
+      }),
+    );
+
+    expect(response.status).toBe(403);
   });
 });

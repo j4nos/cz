@@ -1,6 +1,15 @@
 import type { Schema } from "@/amplify/data/resource";
 import type { AssetDocument, BlogPost } from "@/src/domain/entities/content";
-import type { Asset, Listing, Order, Product, ProductCoupon, UserProfile } from "@/src/domain/entities";
+import type {
+  Asset,
+  EligibleInvestorType,
+  InvestorType,
+  Listing,
+  Order,
+  Product,
+  ProductCoupon,
+  UserProfile,
+} from "@/src/domain/entities";
 import { sanitizeProductCoupons } from "@/src/application/use-cases/productCoupons";
 import { toPublicStorageUrl, toPublicStorageUrls } from "@/src/infrastructure/storage/publicUrls";
 
@@ -40,6 +49,33 @@ function normalizeOrderStatus(value?: string): Order["status"] {
   }
 }
 
+function normalizeInvestorType(value?: string): InvestorType | undefined {
+  switch ((value ?? "").toUpperCase()) {
+    case "RETAIL":
+      return "RETAIL";
+    case "ACCREDITED":
+    case "PRO":
+    case "PROFESSIONAL":
+      return "PROFESSIONAL";
+    default:
+      return undefined;
+  }
+}
+
+function normalizeEligibleInvestorType(value?: string): EligibleInvestorType {
+  switch ((value ?? "").toUpperCase()) {
+    case "RETAIL":
+      return "RETAIL";
+    case "ACCREDITED":
+    case "PRO":
+    case "PROFESSIONAL":
+      return "PROFESSIONAL";
+    case "ANY":
+    default:
+      return "ANY";
+  }
+}
+
 export type AssetRecord = Asset & {
   documents: AssetDocument[];
   beneficiaryIban?: string;
@@ -52,7 +88,7 @@ export function mapUserProfileRecord(item: Schema["UserProfile"]["type"]): UserP
     email: item.email ?? "",
     role: (item.role as UserProfile["role"]) ?? "INVESTOR",
     country: item.country ?? "",
-    investorType: item.investorType ?? undefined,
+    investorType: normalizeInvestorType(item.investorType ?? undefined),
     companyName: item.companyName ?? undefined,
     kycStatus: item.kycStatus
       ? (item.kycStatus.toLowerCase() as UserProfile["kycStatus"])
@@ -120,7 +156,7 @@ export function mapProductRecord(
     unitPrice: Number(item.unitPrice ?? 0),
     minPurchase: Number(item.minPurchase ?? 0),
     maxPurchase: Number(item.maxPurchase ?? 0),
-    eligibleInvestorType: item.eligibleInvestorType ?? "ANY",
+    eligibleInvestorType: normalizeEligibleInvestorType(item.eligibleInvestorType ?? undefined),
     supplyTotal: Number(item.supplyTotal ?? 0),
     remainingSupply: Number(item.remainingSupply ?? 0),
     coupons: sanitizeProductCoupons(coupons),

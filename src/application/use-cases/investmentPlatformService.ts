@@ -1,5 +1,13 @@
 import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
-import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
+import type {
+  Asset,
+  EligibleInvestorType,
+  InvestorType,
+  Listing,
+  Order,
+  Product,
+  UserProfile,
+} from "@/src/domain/entities";
 import { getCouponPricing, normalizeCouponCode } from "@/src/application/use-cases/productCoupons";
 import { DomainError } from "@/src/domain/value-objects/errors";
 
@@ -22,7 +30,7 @@ export class InvestmentPlatformService {
     email: string;
     role: UserProfile["role"];
     country: string;
-    investorType?: string;
+    investorType?: InvestorType;
     companyName?: string;
   }): Promise<UserProfile> {
     const timestamp = this.clock.now();
@@ -97,7 +105,7 @@ export class InvestmentPlatformService {
     unitPrice: number;
     minPurchase: number;
     maxPurchase: number;
-    eligibleInvestorType: string;
+    eligibleInvestorType: EligibleInvestorType;
     supplyTotal: number;
     coupons?: Product["coupons"];
   }): Promise<Product> {

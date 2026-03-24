@@ -1,4 +1,4 @@
-import type { UserProfile, UserRole } from "@/src/domain/entities";
+import type { InvestorType, UserProfile, UserRole } from "@/src/domain/entities";
 
 export type AuthUser = {
   uid: string;
@@ -27,7 +27,7 @@ export type AuthClient = {
     email: string;
     role: UserRole;
     country?: string;
-    investorType?: string;
+    investorType?: InvestorType;
     companyName?: string;
     kycStatus?: UserProfile["kycStatus"];
   }) => Promise<void>;

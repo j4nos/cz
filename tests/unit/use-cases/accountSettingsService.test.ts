@@ -38,7 +38,7 @@ describe("AccountSettingsService", () => {
         user: null,
         profile: null,
         country: "HU",
-        investorType: "PRO",
+        investorType: "PROFESSIONAL",
         companyName: "Investor Co",
       }),
     ).resolves.toEqual({ kind: "error", message: "Login to manage settings." });
@@ -51,7 +51,7 @@ describe("AccountSettingsService", () => {
       user: { uid: "user-1" },
       profile: makeUserProfile({ role: undefined as never }),
       country: "HU",
-      investorType: "PRO",
+      investorType: "PROFESSIONAL",
       companyName: "Investor Co",
     });
 

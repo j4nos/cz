@@ -1,5 +1,5 @@
 import type { AuthClient, AuthUser } from "@/src/application/interfaces/authClient";
-import type { UserProfile } from "@/src/domain/entities";
+import type { InvestorType, UserProfile } from "@/src/domain/entities";
 
 type SaveProviderSettingsInput = {
   user: AuthUser | null;
@@ -12,7 +12,7 @@ type SaveInvestorSettingsInput = {
   user: AuthUser | null;
   profile: UserProfile | null;
   country: string;
-  investorType: string;
+  investorType: InvestorType;
   companyName: string;
 };
 

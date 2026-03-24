@@ -57,7 +57,7 @@ type ChatPanelProps = {
 };
 
 export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
-  const { activeUser, ensureAnonymous } = useAuth();
+  const { activeUser, accessToken, ensureAnonymous } = useAuth();
   const { setToast } = useToast();
   const client = useMemo(() => {
     ensureAmplifyConfigured();
@@ -92,6 +92,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
 
     async function loadThreads() {
       const response = await fetch(`/api/chat?userId=${encodeURIComponent(resolvedUserId)}&listThreads=1`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -122,15 +123,15 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     return () => {
       controller.abort();
     };
-  }, [resolvedUserId, setToast]);
+  }, [accessToken, resolvedUserId, setToast]);
 
   useEffect(() => {
-    if (!resolvedUserId) {
+    if (!resolvedUserId || !accessToken) {
       return;
     }
 
     const onCreateSubscription = client.models.UserThread.onCreate({
-      authMode: "apiKey",
+      authMode: "userPool",
       filter: { userId: { eq: resolvedUserId } },
     }).subscribe({
       next: ({ id, lastMessageAt, lastMessageText }) => {
@@ -145,7 +146,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     });
 
     const onUpdateSubscription = client.models.UserThread.onUpdate({
-      authMode: "apiKey",
+      authMode: "userPool",
       filter: { userId: { eq: resolvedUserId } },
     }).subscribe({
       next: ({ id, lastMessageAt, lastMessageText }) => {
@@ -163,7 +164,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
       onCreateSubscription.unsubscribe();
       onUpdateSubscription.unsubscribe();
     };
-  }, [client, resolvedUserId]);
+  }, [accessToken, client, resolvedUserId]);
 
   useEffect(() => {
     if (!resolvedUserId) {
@@ -176,7 +177,10 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     async function loadHistory() {
       const response = await fetch(
         `/api/chat?userId=${encodeURIComponent(resolvedUserId)}&threadId=${encodeURIComponent(threadId)}`,
-        { signal: controller.signal },
+        {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+          signal: controller.signal,
+        },
       );
       if (!response.ok) {
         if (!controller.signal.aborted) {
@@ -205,15 +209,15 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     return () => {
       controller.abort();
     };
-  }, [resolvedUserId, setToast, threadId]);
+  }, [accessToken, resolvedUserId, setToast, threadId]);
 
   useEffect(() => {
-    if (!resolvedUserId || !threadId) {
+    if (!resolvedUserId || !threadId || !accessToken) {
       return;
     }
 
     const subscription = client.models.UserMessage.onCreate({
-      authMode: "apiKey",
+      authMode: "userPool",
       filter: {
         userId: { eq: resolvedUserId },
         threadId: { eq: threadId },
@@ -236,7 +240,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [client, resolvedUserId, threadId]);
+  }, [accessToken, client, resolvedUserId, threadId]);
 
   async function send() {
     const text = draft.trim();
@@ -269,6 +273,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({
           threadId,

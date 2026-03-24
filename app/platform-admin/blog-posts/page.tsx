@@ -38,10 +38,13 @@ export default function PlatformAdminBlogPostsPage() {
             contentType: file.type || undefined,
           },
         }).result;
-        const response = await client.models.BlogPost.update({
-          id: postId,
-          coverImage: path,
-        });
+        const response = await client.models.BlogPost.update(
+          {
+            id: postId,
+            coverImage: path,
+          },
+          { authMode: "userPool" },
+        );
         if (!response.data) {
           throw new Error(response.errors?.[0]?.message || "Failed to update blog cover image.");
         }

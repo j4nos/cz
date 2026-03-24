@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { ChatService } from "@/src/application/use-cases/chatService";
+import {
+  getAnonCookieName,
+  parseAnonCookieValue,
+} from "@/src/infrastructure/auth/anonSession";
+import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
 import { RuleBasedChatGateway } from "@/src/infrastructure/gateways/ruleBasedChatGateway";
 import { AmplifyChatRepository } from "@/src/infrastructure/repositories/amplifyChatRepository";
 
@@ -27,6 +32,53 @@ function createService() {
   );
 }
 
+const getBearerToken = (request: Request): string => {
+  const authHeader = request.headers.get("authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return "";
+  }
+
+  return authHeader.slice("Bearer ".length).trim();
+};
+
+async function authorizeChatRequest(request: Request, requestedUserId: string) {
+  const token = getBearerToken(request);
+  if (token) {
+    try {
+      const payload = await verifyAccessToken(token);
+      const tokenUserId = payload.sub as string | undefined;
+      if (tokenUserId && tokenUserId === requestedUserId) {
+        return { ok: true as const };
+      }
+    } catch {
+      return { ok: false as const, status: 401, error: "Invalid bearer token." };
+    }
+
+    return { ok: false as const, status: 403, error: "Forbidden." };
+  }
+
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const anonCookie = cookieHeader
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${getAnonCookieName()}=`));
+  if (!anonCookie) {
+    return { ok: false as const, status: 401, error: "Authentication required." };
+  }
+
+  const anonValue = anonCookie.split("=").slice(1).join("=");
+  const anonSession = anonValue ? parseAnonCookieValue(anonValue) : null;
+  if (!anonSession) {
+    return { ok: false as const, status: 401, error: "Invalid anonymous session." };
+  }
+
+  if (anonSession.userId !== requestedUserId) {
+    return { ok: false as const, status: 403, error: "Forbidden." };
+  }
+
+  return { ok: true as const };
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
@@ -44,6 +96,11 @@ export async function POST(request: Request) {
         { error: "threadId, userId and input are required." },
         { status: 400 },
       );
+    }
+
+    const auth = await authorizeChatRequest(request, userId);
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const service = createService();
@@ -78,6 +135,11 @@ export async function GET(request: Request) {
   }
 
   try {
+    const auth = await authorizeChatRequest(request, userId);
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const service = createService();
 
     if (listThreads) {
