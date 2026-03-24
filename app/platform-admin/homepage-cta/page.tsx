@@ -8,10 +8,10 @@ import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { useToast } from "@/contexts/ToastContext";
 import type { Schema } from "@/amplify/data/resource";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 
 export default function PlatformAdminHomepageCtaPage() {
-  const { user, isAuthenticated, loading, isAdmin, accessToken } = useAuth();
+  const { user, accessToken } = usePrivateAuth();
   const client = useMemo(() => {
     ensureAmplifyConfigured();
     return generateClient<Schema>();
@@ -23,10 +23,6 @@ export default function PlatformAdminHomepageCtaPage() {
   const { setToast } = useToast();
 
   const loadSettings = useCallback(async () => {
-    if (!isAuthenticated || !isAdmin) {
-      return;
-    }
-
     const { data } = await client.models.PlatformSettings.get(
       {
         id: "homepage",
@@ -37,13 +33,11 @@ export default function PlatformAdminHomepageCtaPage() {
     setFirstListingId(data?.homepageFirstListingId ?? "");
     setSecondAssetId(data?.homepageSecondAssetId ?? "");
     setSecondListingId(data?.homepageSecondListingId ?? "");
-  }, [client, isAdmin, isAuthenticated]);
+  }, [client]);
 
   useEffect(() => {
-    if (!loading && isAuthenticated && isAdmin) {
-      void loadSettings();
-    }
-  }, [isAdmin, isAuthenticated, loadSettings, loading]);
+    void loadSettings();
+  }, [loadSettings]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,18 +80,6 @@ export default function PlatformAdminHomepageCtaPage() {
         error instanceof Error ? error.message : "Failed to save homepage CTA settings.";
       setToast(message, "danger", 3000);
     }
-  }
-
-  if (loading) {
-    return null;
-  }
-
-  if (!isAuthenticated) {
-    return <p className="muted">Login to manage homepage CTA.</p>;
-  }
-
-  if (!isAdmin) {
-    return <p className="muted">Only platform admins can access this page.</p>;
   }
 
   return (

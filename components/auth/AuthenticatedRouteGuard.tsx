@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { usePublicAuth } from "@/contexts/AuthContext";
 
@@ -12,7 +12,6 @@ export function AuthenticatedRouteGuard({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { isAuthenticated, loading } = usePublicAuth();
 
   useEffect(() => {
@@ -20,10 +19,8 @@ export function AuthenticatedRouteGuard({
       return;
     }
 
-    const search = searchParams.toString();
-    const next = `${pathname}${search ? `?${search}` : ""}`;
-    router.replace(`/login?next=${encodeURIComponent(next)}`);
-  }, [isAuthenticated, loading, pathname, router, searchParams]);
+    router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+  }, [isAuthenticated, loading, pathname, router]);
 
   if (loading || !isAuthenticated) {
     return null;

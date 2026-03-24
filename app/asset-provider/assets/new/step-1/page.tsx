@@ -67,7 +67,7 @@ function Step1Content() {
           });
 
       updateState({ assetId: savedAsset.id });
-      router.push(`/asset-provider/assets/new/step-2?assetId=${savedAsset.id}`);
+      router.push(`/asset-provider/assets/new/${savedAsset.id}/step-2`);
     } catch (error) {
       console.error("[asset-step-1] save failed", error);
       setToast(

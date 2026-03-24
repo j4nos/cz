@@ -2,8 +2,8 @@
 
 import { generateClient } from "aws-amplify/data";
 import { uploadData } from "aws-amplify/storage";
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import type { Schema } from "@/amplify/data/resource";
 import { Button } from "@/components/ui/Button";
@@ -18,42 +18,22 @@ import {
   toSafeFileName,
 } from "@/src/infrastructure/storage/publicUrls";
 
-export default function AssetWizardStep2Page() {
-  return (
-    <Suspense fallback={null}>
-      <Step2Content />
-    </Suspense>
-  );
-}
-
-function Step2Content() {
-  const searchParams = useSearchParams();
+export function Step2PageContent({ assetId }: { assetId: string }) {
   const router = useRouter();
-  const searchAssetId = searchParams.get("assetId") ?? "";
   usePrivateAuth();
   const { state, updateState } = useAssetWizard();
-  const assetId = searchAssetId || state.assetId || "";
   const { setToast } = useToast();
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    if (searchAssetId && searchAssetId !== state.assetId) {
-      updateState({ assetId: searchAssetId });
+    if (assetId !== state.assetId) {
+      updateState({ assetId });
     }
-  }, [searchAssetId, state.assetId, updateState]);
-
-  if (!assetId) {
-    return <p className="muted">Missing assetId. Complete Step 1 first.</p>;
-  }
+  }, [assetId, state.assetId, updateState]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!assetId) {
-      setToast("Missing assetId. Complete Step 1 first.", "danger", 2000);
-      return;
-    }
 
     if (!files.length) {
       setToast("Please select file(s)", "warning", 2000);
@@ -99,11 +79,7 @@ function Step2Content() {
   }
 
   function handleSkip() {
-    if (!assetId) {
-      setToast("Missing assetId. Complete Step 1 first.", "danger", 2000);
-      return;
-    }
-    router.push(`/asset-provider/assets/new/step-3?assetId=${assetId}`);
+    router.push(`/asset-provider/assets/new/${assetId}/step-3`);
   }
 
   return (

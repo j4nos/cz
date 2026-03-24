@@ -2,8 +2,8 @@
 
 import { generateClient } from "aws-amplify/data";
 import { uploadData } from "aws-amplify/storage";
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import type { Schema } from "@/amplify/data/resource";
 import { Button } from "@/components/ui/Button";
@@ -14,41 +14,24 @@ import { usePrivateAuth } from "@/contexts/AuthContext";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { assetDocPrefix, toSafeFileName } from "@/src/infrastructure/storage/publicUrls";
 
-export default function AssetWizardStep3Page() {
-  return (
-    <Suspense fallback={null}>
-      <Step3Content />
-    </Suspense>
-  );
-}
-
-function Step3Content() {
-  const searchParams = useSearchParams();
+export function Step3PageContent({ assetId }: { assetId: string }) {
   const router = useRouter();
-  const searchAssetId = searchParams.get("assetId") ?? "";
   const { state, updateState } = useAssetWizard();
-  const assetId = searchAssetId || state.assetId || "";
   const { user } = usePrivateAuth();
   const [docType, setDocType] = useState("brochure");
   const [file, setFile] = useState<File | null>(null);
   const { setToast } = useToast();
 
   useEffect(() => {
-    if (searchAssetId && searchAssetId !== state.assetId) {
-      updateState({ assetId: searchAssetId });
+    if (assetId !== state.assetId) {
+      updateState({ assetId });
     }
-  }, [searchAssetId, state.assetId, updateState]);
-
-  if (!assetId) {
-    return (
-      <p className="muted">Missing assetId. Complete previous steps first.</p>
-    );
-  }
+  }, [assetId, state.assetId, updateState]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!assetId || !file) {
+    if (!file) {
       setToast("Please choose a document", "warning", 2000);
       return;
     }
@@ -79,16 +62,7 @@ function Step3Content() {
   }
 
   function handleSkip() {
-    if (!assetId) {
-      setToast(
-        "Missing assetId. Complete previous steps first.",
-        "danger",
-        2000
-      );
-      return;
-    }
-
-    router.push(`/asset-provider/assets/new/step-4?assetId=${assetId}`);
+    router.push(`/asset-provider/assets/new/${assetId}/step-4`);
   }
 
   return (

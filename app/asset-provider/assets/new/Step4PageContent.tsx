@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { KeyValueList } from "@/components/ui/KeyValueList";
@@ -11,33 +11,17 @@ import { useToast } from "@/contexts/ToastContext";
 import type { Asset } from "@/src/domain/entities";
 import { createInvestmentRepository } from "@/src/infrastructure/composition/defaults";
 
-export default function AssetWizardStep4Page() {
-  return (
-    <Suspense fallback={null}>
-      <Step4Content />
-    </Suspense>
-  );
-}
-
-function Step4Content() {
-  const searchParams = useSearchParams();
+export function Step4PageContent({ assetId }: { assetId: string }) {
   const router = useRouter();
   const { accessToken } = usePrivateAuth();
   const { setToast } = useToast();
   const { state, updateState, resetState } = useAssetWizard();
-  const assetId = searchParams.get("assetId");
-  const effectiveAssetId = assetId || state.assetId;
   const [asset, setAsset] = useState<Asset | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     async function load() {
-      if (!effectiveAssetId) {
-        setAsset(null);
-        return;
-      }
-
-      const loadedAsset = await createInvestmentRepository().getAssetById(effectiveAssetId);
+      const loadedAsset = await createInvestmentRepository().getAssetById(assetId);
       setAsset(loadedAsset);
 
       if (loadedAsset) {
@@ -56,20 +40,9 @@ function Step4Content() {
     }
 
     void load();
-  }, [effectiveAssetId, state.tokenStandard, updateState]);
-
-  if (!effectiveAssetId) {
-    return (
-      <p className="muted">Missing assetId. Complete earlier steps first.</p>
-    );
-  }
+  }, [assetId, state.tokenStandard, updateState]);
 
   async function submitAsset() {
-    if (!effectiveAssetId) {
-      setToast("Missing assetId. Complete earlier steps first.", "danger", 2000);
-      return;
-    }
-
     const nameValue = asset?.name || state.name;
     const countryValue = asset?.country || state.country;
     const assetClassValue = asset?.assetClass || state.assetClass;
@@ -97,7 +70,7 @@ function Step4Content() {
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          assetId: effectiveAssetId,
+          assetId,
           name: nameValue,
           country: countryValue,
           assetClass: assetClassValue,

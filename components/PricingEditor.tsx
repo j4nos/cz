@@ -26,6 +26,7 @@ import {
   type PricingTier,
   type ProductPricingState,
 } from "@/src/application/dto/pricingState";
+import type { EligibleInvestorType } from "@/src/domain/entities";
 import { createPricingController } from "@/src/infrastructure/controllers/createPricingController";
 
 type Props = {
@@ -345,7 +346,10 @@ export function PricingEditor({
                 { value: "RETAIL", label: "Retail" },
               ]}
               onChange={(event) =>
-                updateField("eligibleInvestorType", event.target.value)
+                updateField(
+                  "eligibleInvestorType",
+                  event.target.value as EligibleInvestorType,
+                )
               }
             />
           </FormField>

@@ -13,7 +13,7 @@ import { createReadController } from "@/src/infrastructure/controllers/createRea
 
 export default function PowensReturnPage() {
   return (
-    <Suspense fallback={<div className="muted" aria-hidden="true" />}>
+    <Suspense fallback={null}>
       <PowensReturnContent />
     </Suspense>
   );

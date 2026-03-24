@@ -1,7 +1,7 @@
 "use client";
 
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
 
 import { SectionContainer } from "@/components/sections/SectionContainer";
 import { AppLink } from "@/components/ui/AppLink";
@@ -12,6 +12,14 @@ import { useToast } from "@/contexts/ToastContext";
 import styles from "./page.module.css";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, loading } = useAuth();

@@ -9,7 +9,7 @@ import { BlogPostsTable } from "@/components/platform-admin/BlogPostsTable";
 import type { Schema } from "@/amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 import { uploadData } from "aws-amplify/storage";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import {
   BlogPostAdminService,
@@ -21,7 +21,7 @@ import { createBlogAdminController } from "@/src/infrastructure/controllers/crea
 import { blogCoverPrefix, toSafeFileName } from "@/src/infrastructure/storage/publicUrls";
 
 export default function PlatformAdminBlogPostsPage() {
-  const { loading, isAuthenticated, isAdmin, accessToken } = useAuth();
+  const { accessToken } = usePrivateAuth();
   const { setToast } = useToast();
   const controller = useMemo(() => createBlogAdminController(), []);
   const blogPostAdminService = useMemo(
@@ -63,10 +63,8 @@ export default function PlatformAdminBlogPostsPage() {
   }, [blogPostAdminService]);
 
   useEffect(() => {
-    if (!loading && isAuthenticated && isAdmin) {
-      void loadPosts();
-    }
-  }, [isAuthenticated, isAdmin, loadPosts, loading]);
+    void loadPosts();
+  }, [loadPosts]);
 
   const editingPost = useMemo(
     () => posts.find((post) => post.id === editingPostId) ?? null,
@@ -132,18 +130,6 @@ export default function PlatformAdminBlogPostsPage() {
     } finally {
       setDeletingId(null);
     }
-  }
-
-  if (loading) {
-    return null;
-  }
-
-  if (!isAuthenticated) {
-    return <p className="muted">Login to manage blog posts.</p>;
-  }
-
-  if (!isAdmin) {
-    return <p className="muted">Only platform admins can access this page.</p>;
   }
 
   return (
