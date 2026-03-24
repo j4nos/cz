@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Schema } from "@/amplify/data/resource";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
 import { useToast } from "@/contexts/ToastContext";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
@@ -30,7 +30,7 @@ function Step2Content() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const searchAssetId = searchParams.get("assetId") ?? "";
-  const { user } = useAuth();
+  usePrivateAuth();
   const { state, updateState } = useAssetWizard();
   const assetId = searchAssetId || state.assetId || "";
   const { setToast } = useToast();
@@ -45,10 +45,6 @@ function Step2Content() {
 
   if (!assetId) {
     return <p className="muted">Missing assetId. Complete Step 1 first.</p>;
-  }
-
-  if (!user) {
-    return <p className="muted">Login to upload photos.</p>;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

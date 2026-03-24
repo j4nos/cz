@@ -4,14 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { AccountSettingsService } from "@/src/application/use-cases/accountSettingsService";
 import type { InvestorType } from "@/src/domain/entities";
 import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
 
 export default function InvestorSettingsPage() {
-  const { user, profile, logout, accessToken } = useAuth();
+  const { user, profile, logout, accessToken } = usePrivateAuth();
   const router = useRouter();
   const { setToast } = useToast();
   const accountSettingsService = useMemo(
@@ -45,10 +45,6 @@ export default function InvestorSettingsPage() {
     setCompanyName(profile?.companyName ?? "");
   }, [profile]);
 
-  if (!user || !profile) {
-    return <p className="muted">Login to manage settings.</p>;
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
@@ -66,7 +62,6 @@ export default function InvestorSettingsPage() {
   }
 
   async function handleDeleteAccount() {
-    if (!user) return;
     const confirmed = window.confirm(
       "Delete your account and profile? This cannot be undone."
     );

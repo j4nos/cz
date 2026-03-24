@@ -5,14 +5,14 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Table } from "@/components/ui/Table";
 import { OwnershipMintingService } from "@/src/application/use-cases/ownershipMintingService";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useLoading } from "@/contexts/LoadingContext";
 import type { Order, Product } from "@/src/domain/entities";
 import { createOrderController } from "@/src/infrastructure/controllers/createOrderController";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 
 export default function AssetProviderOrdersPage() {
-  const { user, loading, accessToken } = useAuth();
+  const { user, loading, accessToken } = usePrivateAuth();
   const { setLoading } = useLoading();
   const readController = useMemo(() => createReadController(), []);
   const orderController = useMemo(() => createOrderController(), []);
@@ -52,12 +52,6 @@ export default function AssetProviderOrdersPage() {
   useEffect(() => {
     async function load() {
       setLoading("asset-provider-orders", true);
-      if (!user) {
-        setOrders([]);
-        setProductsById({});
-        setLoading("asset-provider-orders", false);
-        return;
-      }
       try {
         const next = await readController.listOrdersByProvider(user.uid);
         next.sort(
@@ -88,12 +82,9 @@ export default function AssetProviderOrdersPage() {
       }
     }
     void load();
-  }, [readController, setLoading, user]);
+  }, [readController, setLoading, user.uid]);
 
   async function handleMarkPaid(orderId: string) {
-    if (!user) {
-      return;
-    }
     setUpdatingId(orderId);
     try {
       const currentOrder = await readController.getOrderById(orderId);
@@ -150,10 +141,6 @@ export default function AssetProviderOrdersPage() {
 
   if (loading) {
     return null;
-  }
-
-  if (!user) {
-    return <p className="muted">Login to view provider orders.</p>;
   }
 
   return (

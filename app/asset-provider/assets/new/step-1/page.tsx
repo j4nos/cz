@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
 import { createInvestmentRepository } from "@/src/infrastructure/composition/defaults";
@@ -21,7 +21,7 @@ export default function AssetWizardStep1Page() {
 function Step1Content() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user } = usePrivateAuth();
   const { setToast } = useToast();
   const { state, updateState, resetState } = useAssetWizard();
 
@@ -34,19 +34,10 @@ function Step1Content() {
     router.replace("/asset-provider/assets/new/step-1");
   }, [resetState, router, searchParams]);
 
-  if (!user) {
-    return <p className="muted">Login to create an asset.</p>;
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     try {
-      if (!user) {
-        setToast("Login required to save asset basics.", "danger", 2500);
-        return;
-      }
-
       const assetId = state.assetId || crypto.randomUUID();
       const repository = createInvestmentRepository();
       const existingAsset = await repository.getAssetById(assetId);

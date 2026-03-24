@@ -5,25 +5,19 @@ import { useEffect, useState } from "react";
 import { AppLink } from "@/components/ui/AppLink";
 import { Badge } from "@/components/ui/Badge";
 import { Table } from "@/components/ui/Table";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import type { Order, Product } from "@/src/domain/entities";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 
 export default function InvestorOrdersPage() {
-  const { activeUser, loading } = useAuth();
+  const { user, loading } = usePrivateAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [productsById, setProductsById] = useState<Record<string, Product>>({});
 
   useEffect(() => {
     async function load() {
-      if (!activeUser) {
-        setOrders([]);
-        setProductsById({});
-        return;
-      }
-
       const controller = createReadController();
-      const nextOrders = await controller.listOrdersByInvestor(activeUser.uid);
+      const nextOrders = await controller.listOrdersByInvestor(user.uid);
       const productEntries = await Promise.all(
         Array.from(new Set(nextOrders.map((order) => order.productId))).map(
           async (productId) => [productId, await controller.getProductById(productId)] as const,
@@ -37,14 +31,10 @@ export default function InvestorOrdersPage() {
     }
 
     void load();
-  }, [activeUser]);
+  }, [user.uid]);
 
   if (loading) {
     return null;
-  }
-
-  if (!activeUser) {
-    return <p className="muted">Login to see your orders.</p>;
   }
 
   return (

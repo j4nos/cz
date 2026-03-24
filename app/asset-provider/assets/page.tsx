@@ -3,33 +3,25 @@
 import { useEffect, useState } from "react";
 import { PlainCta } from "@/components/sections/PlainCta";
 import { AppLink } from "@/components/ui/AppLink";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/Badge";
 import { Table } from "@/components/ui/Table";
 import type { Asset } from "@/src/domain/entities";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 
 export default function AssetProviderAssetsPage() {
-  const { activeUser } = useAuth();
+  const { user } = usePrivateAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
 
   useEffect(() => {
     async function load() {
       const controller = createReadController();
       const nextAssets = await controller.listAssets();
-      setAssets(
-        activeUser
-          ? nextAssets.filter((asset) => asset.tenantUserId === activeUser.uid)
-          : []
-      );
+      setAssets(nextAssets.filter((asset) => asset.tenantUserId === user.uid));
     }
 
     void load();
-  }, [activeUser]);
-
-  if (!activeUser) {
-    return null;
-  }
+  }, [user.uid]);
 
   return (
     <div className="vertical-stack-with-gap">

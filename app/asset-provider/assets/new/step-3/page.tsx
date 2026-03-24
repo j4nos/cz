@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
 import { useToast } from "@/contexts/ToastContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import { assetDocPrefix, toSafeFileName } from "@/src/infrastructure/storage/publicUrls";
 
@@ -28,7 +28,7 @@ function Step3Content() {
   const searchAssetId = searchParams.get("assetId") ?? "";
   const { state, updateState } = useAssetWizard();
   const assetId = searchAssetId || state.assetId || "";
-  const { user } = useAuth();
+  const { user } = usePrivateAuth();
   const [docType, setDocType] = useState("brochure");
   const [file, setFile] = useState<File | null>(null);
   const { setToast } = useToast();
@@ -45,20 +45,11 @@ function Step3Content() {
     );
   }
 
-  if (!user) {
-    return <p className="muted">Login to upload documents.</p>;
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!assetId || !file) {
       setToast("Please choose a document", "warning", 2000);
-      return;
-    }
-
-    if (!user) {
-      setToast("Login required to upload.", "danger", 2000);
       return;
     }
 

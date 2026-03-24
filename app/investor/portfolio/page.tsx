@@ -7,14 +7,14 @@ import { WithdrawPopup } from "@/components/WithdrawPopup";
 import { Button } from "@/components/ui/Button";
 import { Table } from "@/components/ui/Table";
 import { OwnershipMintingService } from "@/src/application/use-cases/ownershipMintingService";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useLoading } from "@/contexts/LoadingContext";
 import { useToast } from "@/contexts/ToastContext";
 import type { Order } from "@/src/domain/entities";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 
 export default function InvestorPortfolioPage() {
-  const { activeUser, accessToken, loading } = useAuth();
+  const { user, accessToken, loading } = usePrivateAuth();
   const { setToast } = useToast();
   const { setLoading } = useLoading();
   const readController = useMemo(() => createReadController(), []);
@@ -73,18 +73,8 @@ export default function InvestorPortfolioPage() {
     async function load() {
       setLoading("investor-portfolio", true);
 
-      if (!activeUser) {
-        unstable_batchedUpdates(() => {
-          setOrders([]);
-          setTokenHoldings([]);
-          setTokenAddressByListingId({});
-        });
-        setLoading("investor-portfolio", false);
-        return;
-      }
-
       try {
-        const next = (await readController.listOrdersByInvestor(activeUser.uid)).filter(
+        const next = (await readController.listOrdersByInvestor(user.uid)).filter(
           (order) => order.status === "paid",
         );
 
@@ -152,14 +142,10 @@ export default function InvestorPortfolioPage() {
     }
 
     void load();
-  }, [activeUser, readController, setLoading]);
+  }, [readController, setLoading, user.uid]);
 
   if (loading) {
     return null;
-  }
-
-  if (!activeUser) {
-    return <p className="muted">Login to view your portfolio.</p>;
   }
 
   function openWithdraw(orderId: string) {

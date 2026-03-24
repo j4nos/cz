@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { AccountSettingsService } from "@/src/application/use-cases/accountSettingsService";
 import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
 
 export default function AssetProviderSettingsPage() {
-  const { user, profile, logout, accessToken } = useAuth();
+  const { user, profile, logout, accessToken } = usePrivateAuth();
   const router = useRouter();
   const { setToast } = useToast();
   const accountSettingsService = useMemo(
@@ -40,10 +40,6 @@ export default function AssetProviderSettingsPage() {
     setCountry(profile?.country ?? "");
   }, [profile]);
 
-  if (!user || !profile) {
-    return <p className="muted">Login to edit settings.</p>;
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
@@ -60,7 +56,6 @@ export default function AssetProviderSettingsPage() {
   }
 
   async function handleDeleteAccount() {
-    if (!user) return;
     const confirmed = window.confirm(
       "Delete your account and profile? This cannot be undone."
     );

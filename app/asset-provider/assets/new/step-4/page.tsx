@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { KeyValueList } from "@/components/ui/KeyValueList";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import type { Asset } from "@/src/domain/entities";
 import { createInvestmentRepository } from "@/src/infrastructure/composition/defaults";
@@ -22,7 +22,7 @@ export default function AssetWizardStep4Page() {
 function Step4Content() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, accessToken } = useAuth();
+  const { accessToken } = usePrivateAuth();
   const { setToast } = useToast();
   const { state, updateState, resetState } = useAssetWizard();
   const assetId = searchParams.get("assetId");
@@ -64,18 +64,9 @@ function Step4Content() {
     );
   }
 
-  if (!user) {
-    return <p className="muted">Login to submit.</p>;
-  }
-
   async function submitAsset() {
     if (!effectiveAssetId) {
       setToast("Missing assetId. Complete earlier steps first.", "danger", 2000);
-      return;
-    }
-
-    if (!user) {
-      setToast("Login required.", "danger", 2000);
       return;
     }
 

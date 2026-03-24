@@ -329,3 +329,26 @@ export function useAuth() {
 
   return context;
 }
+
+export function usePublicAuth() {
+  return useAuth();
+}
+
+export function usePrivateAuth() {
+  const context = useAuth();
+
+  if (context.loading) {
+    throw new Error("Private auth hook used before auth finished loading.");
+  }
+
+  if (!context.user) {
+    throw new Error("Private auth hook used without authenticated user.");
+  }
+
+  return {
+    ...context,
+    user: context.user,
+    activeUser: context.user,
+    getActiveUser: () => context.user,
+  };
+}

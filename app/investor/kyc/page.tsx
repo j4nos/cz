@@ -3,21 +3,17 @@
 import { useEffect, useState } from "react";
 import { PlainCta } from "@/components/sections/PlainCta";
 import { Badge } from "@/components/ui/Badge";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePrivateAuth } from "@/contexts/AuthContext";
 import pageStyles from "./page.module.css";
 
 export default function InvestorKycPage() {
-  const { user, profile } = useAuth();
+  const { profile } = usePrivateAuth();
   const [kycStatus, setKycStatus] = useState(profile?.kycStatus ?? "not-started");
   const placeholderId = "kyc-embed-placeholder";
 
   useEffect(() => {
     setKycStatus(profile?.kycStatus ?? "not-started");
   }, [profile]);
-
-  if (!user || !profile) {
-    return <p className="muted">Login to manage KYC.</p>;
-  }
 
   return (
     <div className="vertical-stack-with-gap">

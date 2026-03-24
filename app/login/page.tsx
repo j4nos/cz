@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { SectionContainer } from "@/components/sections/SectionContainer";
@@ -13,6 +13,7 @@ import styles from "./page.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, loading } = useAuth();
   const { setToast } = useToast();
   const [email, setEmail] = useState("");
@@ -24,7 +25,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      router.push("/");
+      router.push(searchParams.get("next") || "/");
     } catch (err) {
       const errorMessage =
         err &&
