@@ -88,8 +88,7 @@ const schema = a.schema({
     })
     .authorization((allow) => [
       allow.publicApiKey().to(["read"]),
-      allow.ownerDefinedIn("investorId"),
-      allow.ownerDefinedIn("providerUserId"),
+      allow.owner(),
     ]),
 
   Product: a
@@ -165,7 +164,7 @@ const schema = a.schema({
       product: a.belongsTo("Product", "productId"),
       mintRequests: a.hasMany("MintRequest", "orderId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.owner()]),
 
   ContractDeploymentRequest: a
     .model({
@@ -181,7 +180,7 @@ const schema = a.schema({
       updatedAt: a.datetime(),
       asset: a.belongsTo("Asset", "assetId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.owner()]),
 
   MintRequest: a
     .model({
@@ -199,7 +198,7 @@ const schema = a.schema({
       updatedAt: a.datetime(),
       order: a.belongsTo("Order", "orderId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.owner()]),
 
   DocumentMeta: a
     .model({
@@ -212,7 +211,7 @@ const schema = a.schema({
       asset: a.belongsTo("Asset", "assetId"),
       uploadedByUser: a.belongsTo("UserProfile", "uploadedByUserId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.owner()]),
 
   DueDiligenceRun: a
     .model({
@@ -224,7 +223,7 @@ const schema = a.schema({
       missingSummary: a.string(),
       asset: a.belongsTo("Asset", "assetId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.owner()]),
 
   UserSubscription: a
     .model({
@@ -234,7 +233,7 @@ const schema = a.schema({
       price: a.float().required(),
       investor: a.belongsTo("UserProfile", "investorId"),
     })
-    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+    .authorization((allow) => [allow.owner()]),
 
   PlatformSettings: a
     .model({

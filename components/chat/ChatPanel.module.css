@@ -33,6 +33,23 @@
   justify-content: space-between;
 }
 
+.authPrompt {
+  padding: 0.8rem;
+  border-bottom: 1px solid #ededed;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.authPrompt p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.authActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .threads {
   border-bottom: 1px solid #ededed;
   flex-wrap: wrap;

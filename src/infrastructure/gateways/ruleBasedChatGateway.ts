@@ -1,7 +1,19 @@
 import type { ChatGateway } from "@/src/application/interfaces/chatPorts";
 
 export class RuleBasedChatGateway implements ChatGateway {
-  async reply(input: { message: string }): Promise<string> {
+  async reply(input: {
+    userId: string;
+    threadId: string;
+    message: string;
+    history: Array<{
+      id: string;
+      threadId: string;
+      userId: string;
+      role: "user" | "assistant";
+      text: string;
+      createdAt: string;
+    }>;
+  }): Promise<string> {
     const text = input.message.trim().toLowerCase();
 
     if (text.includes("listing") || text.includes("asset")) {

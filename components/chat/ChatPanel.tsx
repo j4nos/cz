@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { generateClient } from "aws-amplify/data";
+import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleNotch,
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { ensureAmplifyConfigured } from "@/src/config/amplify";
+import { listAll } from "@/src/infrastructure/amplify/pagination";
 import styles from "./ChatPanel.module.css";
 
 type Message = {
@@ -57,7 +59,8 @@ type ChatPanelProps = {
 };
 
 export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
-  const { activeUser, accessToken, ensureAnonymous } = useAuth();
+  const router = useRouter();
+  const { user, activeUser, accessToken, getAccessToken } = useAuth();
   const { setToast } = useToast();
   const client = useMemo(() => {
     ensureAmplifyConfigured();
@@ -72,15 +75,37 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (activeUser || userId) {
+  async function saveThread(input: ThreadSummary & { userId: string; state?: string }) {
+    const existing = await client.models.UserThread.get(
+      { id: input.threadId },
+      { authMode: "userPool" },
+    );
+
+    if (existing.data) {
+      await client.models.UserThread.update(
+        {
+          id: input.threadId,
+          userId: input.userId,
+          lastMessageAt: input.lastMessageAt,
+          lastMessageText: input.lastMessageText,
+          state: input.state,
+        },
+        { authMode: "userPool" },
+      );
       return;
     }
 
-    void ensureAnonymous().catch(() => {
-      // Keep silent here; send() will surface a user-facing error if needed.
-    });
-  }, [activeUser, ensureAnonymous, userId]);
+    await client.models.UserThread.create(
+      {
+        id: input.threadId,
+        userId: input.userId,
+        lastMessageAt: input.lastMessageAt,
+        lastMessageText: input.lastMessageText,
+        state: input.state ?? "{}",
+      },
+      { authMode: "userPool" },
+    );
+  }
 
   useEffect(() => {
     if (!resolvedUserId) {
@@ -91,22 +116,23 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     const controller = new AbortController();
 
     async function loadThreads() {
-      const response = await fetch(`/api/chat?userId=${encodeURIComponent(resolvedUserId)}&listThreads=1`, {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        if (!controller.signal.aborted) {
-          setToast("Could not load your chat threads.", "danger", 2500);
-        }
-        return;
-      }
-      const data = (await response.json()) as { threads?: ThreadSummary[] };
+      const items = await listAll<Schema["UserThread"]["type"]>((nextToken) =>
+        client.models.UserThread.list({
+          filter: { userId: { eq: resolvedUserId } },
+          authMode: "userPool",
+          ...(nextToken ? { nextToken } : {}),
+        }),
+      );
+
       if (!controller.signal.aborted) {
         setThreads(
-          (data.threads ?? []).sort((left, right) =>
-            right.lastMessageAt.localeCompare(left.lastMessageAt),
-          ),
+          items
+            .map((item) => ({
+              threadId: item.id,
+              lastMessageAt: item.lastMessageAt ?? "",
+              lastMessageText: item.lastMessageText ?? "",
+            }))
+            .sort((left, right) => right.lastMessageAt.localeCompare(left.lastMessageAt)),
         );
       }
     }
@@ -123,10 +149,10 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     return () => {
       controller.abort();
     };
-  }, [accessToken, resolvedUserId, setToast]);
+  }, [client, resolvedUserId, setToast]);
 
   useEffect(() => {
-    if (!resolvedUserId || !accessToken) {
+    if (!resolvedUserId) {
       return;
     }
 
@@ -164,7 +190,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
       onCreateSubscription.unsubscribe();
       onUpdateSubscription.unsubscribe();
     };
-  }, [accessToken, client, resolvedUserId]);
+  }, [client, resolvedUserId]);
 
   useEffect(() => {
     if (!resolvedUserId) {
@@ -175,24 +201,28 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     const controller = new AbortController();
 
     async function loadHistory() {
-      const response = await fetch(
-        `/api/chat?userId=${encodeURIComponent(resolvedUserId)}&threadId=${encodeURIComponent(threadId)}`,
-        {
-          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-          signal: controller.signal,
-        },
+      const items = await listAll<Schema["UserMessage"]["type"]>((nextToken) =>
+        client.models.UserMessage.list({
+          filter: {
+            threadId: { eq: threadId },
+            userId: { eq: resolvedUserId },
+          },
+          authMode: "userPool",
+          ...(nextToken ? { nextToken } : {}),
+        }),
       );
-      if (!response.ok) {
-        if (!controller.signal.aborted) {
-          setToast("Could not load this thread.", "danger", 2500);
-          setMessages([]);
-        }
-        return;
-      }
 
-      const data = (await response.json()) as { messages?: Message[] };
       if (!controller.signal.aborted) {
-        setMessages(data.messages ?? []);
+        setMessages(
+          items
+            .map((item) => ({
+              id: item.id,
+              role: (item.role as Message["role"]) ?? "user",
+              text: item.text ?? "",
+              createdAt: item.createdAt ?? undefined,
+            }))
+            .sort((left, right) => (left.createdAt ?? "").localeCompare(right.createdAt ?? "")),
+        );
       }
     }
 
@@ -209,10 +239,10 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     return () => {
       controller.abort();
     };
-  }, [accessToken, resolvedUserId, setToast, threadId]);
+  }, [client, resolvedUserId, setToast, threadId]);
 
   useEffect(() => {
-    if (!resolvedUserId || !threadId || !accessToken) {
+    if (!resolvedUserId || !threadId) {
       return;
     }
 
@@ -240,7 +270,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [accessToken, client, resolvedUserId, threadId]);
+  }, [client, resolvedUserId, threadId]);
 
   async function send() {
     const text = draft.trim();
@@ -248,18 +278,10 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
       return;
     }
 
-    let currentUser = activeUser;
+    const currentUser = activeUser;
     if (!currentUser) {
-      try {
-        currentUser = await ensureAnonymous();
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Could not start anonymous chat.";
-        setMessages((current) => [
-          ...current,
-          { id: `${threadId}-e-${Date.now()}`, role: "assistant", text: message, createdAt: new Date().toISOString() },
-        ]);
-        return;
-      }
+      router.push("/login?next=/chat");
+      return;
     }
 
     const currentUserId = currentUser?.uid ?? userId ?? "";
@@ -269,11 +291,58 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
 
     setIsLoading(true);
     try {
-      const response = await fetch("/api/chat", {
+      const now = new Date().toISOString();
+      const userMessageId =
+        typeof crypto !== "undefined" ? crypto.randomUUID() : `${threadId}-u-${Date.now()}`;
+
+      await client.models.UserMessage.create(
+        {
+          id: userMessageId,
+          threadId,
+          userId: currentUserId,
+          role: "user",
+          text,
+          createdAt: now,
+        },
+        { authMode: "userPool" },
+      );
+
+      await saveThread({
+        threadId,
+        userId: currentUserId,
+        lastMessageAt: now,
+        lastMessageText: text,
+      });
+
+      setMessages((current) =>
+        mergeMessages(current, [
+          {
+            id: userMessageId,
+            role: "user",
+            text,
+            createdAt: now,
+          },
+        ]),
+      );
+      setThreads((current) =>
+        upsertThread(current, {
+          threadId,
+          lastMessageAt: now,
+          lastMessageText: text,
+        }),
+      );
+      setDraft("");
+
+      const bearerToken = accessToken ?? (await getAccessToken());
+      if (!bearerToken) {
+        throw new Error("Missing access token.");
+      }
+
+      const response = await fetch("/api/chat/respond", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          Authorization: `Bearer ${bearerToken}`,
         },
         body: JSON.stringify({
           threadId,
@@ -286,40 +355,40 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
         answer?: string;
         error?: string;
         thread?: ThreadSummary;
-        messageIds?: string[];
+        messageId?: string;
       };
       if (!response.ok) {
         throw new Error(data.error || "Chat request failed.");
       }
 
-      const now = new Date().toISOString();
-      setMessages((current) =>
-        mergeMessages(current, [
-          {
-            id: data.messageIds?.[0] ?? `${threadId}-u-${now}`,
-            role: "user",
-            text,
-            createdAt: now,
-          },
-          {
-            id: data.messageIds?.[1] ?? `${threadId}-a-${now}`,
-            role: "assistant",
-            text: data.answer ?? "",
-            createdAt: now,
-          },
-        ]),
-      );
-      setDraft("");
+      const assistantAnswer = data.answer;
+      if (assistantAnswer) {
+        setMessages((current) =>
+          mergeMessages(current, [
+            {
+              id: data.messageId ?? `${threadId}-a-${Date.now()}`,
+              role: "assistant",
+              text: assistantAnswer,
+              createdAt: new Date().toISOString(),
+            },
+          ]),
+        );
+      }
 
-      if (data.thread) {
-        const nextThread = data.thread;
+      const nextThread = data.thread;
+      if (nextThread) {
         setThreads((current) => upsertThread(current, nextThread));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Chat request failed.";
       setMessages((current) => [
         ...current,
-        { id: `${threadId}-e-${Date.now()}`, role: "assistant", text: message, createdAt: new Date().toISOString() },
+        {
+          id: `${threadId}-e-${Date.now()}`,
+          role: "assistant",
+          text: message,
+          createdAt: new Date().toISOString(),
+        },
       ]);
     } finally {
       setIsLoading(false);
@@ -346,6 +415,20 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
           </Button>
         ) : null}
       </div>
+
+      {!activeUser ? (
+        <div className={styles.authPrompt}>
+          <p>Sign in to start chatting.</p>
+          <div className={styles.authActions}>
+            <Button onClick={() => router.push("/login?next=/chat")} type="button">
+              Login
+            </Button>
+            <Button onClick={() => router.push("/register?next=/chat")} type="button" variant="ghost">
+              Register
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className={styles.threads}>
         {threads.length === 0 ? (

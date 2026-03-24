@@ -10,6 +10,7 @@ import {
   resendSignUpCode,
   resetPassword,
   signIn,
+  signInWithRedirect,
   signOut,
   signUp,
 } from "aws-amplify/auth";
@@ -26,22 +27,29 @@ type UserProfileRepository = {
 
 const listeners = new Set<(user: AuthUser | null) => void>();
 
-function mapCurrentUser(user: Awaited<ReturnType<typeof getAmplifyCurrentUser>> | null): AuthUser | null {
+function mapCurrentUser(
+  user: Awaited<ReturnType<typeof getAmplifyCurrentUser>> | null,
+  sessionEmail?: string | null,
+): AuthUser | null {
   if (!user) {
     return null;
   }
 
   return {
     uid: user.userId,
-    email: user.signInDetails?.loginId,
+    email: user.signInDetails?.loginId ?? sessionEmail ?? undefined,
   };
 }
 
 async function readCurrentUser(): Promise<AuthUser | null> {
   try {
     ensureAmplifyConfigured();
+    const session = await fetchAuthSession();
+    const sessionPayload = session.tokens?.idToken?.payload;
+    const sessionEmail =
+      typeof sessionPayload?.email === "string" ? sessionPayload.email : null;
     const user = await getAmplifyCurrentUser();
-    return mapCurrentUser(user);
+    return mapCurrentUser(user, sessionEmail);
   } catch {
     return null;
   }
@@ -139,6 +147,10 @@ export function createAmplifyAuthClient(repository: UserProfileRepository): Auth
       cachedUser = user;
       await notify();
       return user;
+    },
+    async signInWithGoogle() {
+      ensureAmplifyConfigured();
+      await signInWithRedirect({ provider: "Google" });
     },
     async createUserWithEmailAndPassword(email: string, password: string) {
       ensureAmplifyConfigured();

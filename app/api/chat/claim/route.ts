@@ -1,167 +1,254 @@
-import { generateClient } from "aws-amplify/data";
 import { NextResponse } from "next/server";
 
-import type { Schema } from "@/amplify/data/resource";
-import {
-  getAnonCookieName,
-  parseAnonCookieValue,
-} from "@/src/infrastructure/auth/anonSession";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
-import { listAll } from "@/src/infrastructure/amplify/pagination";
+import outputs from "@/amplify_outputs.json";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
-import { getNodeEnv } from "@/src/config/runtimeEnv";
 
-const getClient = () => {
-  ensureAmplifyConfigured();
-  return generateClient<Schema>();
-};
+const dataUrl = outputs.data?.url;
 
 const getBearerToken = (request: Request): string => {
   const authHeader = request.headers.get("authorization") || "";
-  if (!authHeader.startsWith("Bearer ")) return "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return "";
+  }
+
   return authHeader.slice("Bearer ".length).trim();
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+async function callDataGraphql<T>(
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<T> {
+  if (!dataUrl) {
+    throw new Error("Amplify Data URL is missing.");
+  }
 
-const withRetry = async <T>(fn: () => Promise<T>, attempts = 3) => {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-      if (attempt < attempts) {
-        await sleep(200 * attempt);
+  const response = await fetch(dataUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: token,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  const payload = (await response.json()) as {
+    data?: T;
+    errors?: Array<{ message?: string }>;
+  };
+
+  if (!response.ok || payload.errors?.length) {
+    throw new Error(payload.errors?.[0]?.message ?? "GraphQL request failed.");
+  }
+
+  if (!payload.data) {
+    throw new Error("GraphQL response data is missing.");
+  }
+
+  return payload.data;
+}
+
+const listUserThreadsQuery = /* GraphQL */ `
+  query ListUserThreads($filter: ModelUserThreadFilterInput, $nextToken: String) {
+    listUserThreads(filter: $filter, nextToken: $nextToken) {
+      items {
+        id
+        userId
+        lastMessageAt
+        lastMessageText
+        state
       }
+      nextToken
     }
   }
-  throw lastError ?? new Error("Operation failed after retries.");
+`;
+
+const listUserMessagesQuery = /* GraphQL */ `
+  query ListUserMessages($filter: ModelUserMessageFilterInput, $nextToken: String) {
+    listUserMessages(filter: $filter, nextToken: $nextToken) {
+      items {
+        id
+        threadId
+        userId
+        role
+        text
+        createdAt
+      }
+      nextToken
+    }
+  }
+`;
+
+const createUserThreadMutation = /* GraphQL */ `
+  mutation CreateUserThread($input: CreateUserThreadInput!) {
+    createUserThread(input: $input) {
+      id
+    }
+  }
+`;
+
+const createUserMessageMutation = /* GraphQL */ `
+  mutation CreateUserMessage($input: CreateUserMessageInput!) {
+    createUserMessage(input: $input) {
+      id
+    }
+  }
+`;
+
+const deleteUserThreadMutation = /* GraphQL */ `
+  mutation DeleteUserThread($input: DeleteUserThreadInput!) {
+    deleteUserThread(input: $input) {
+      id
+    }
+  }
+`;
+
+const deleteUserMessageMutation = /* GraphQL */ `
+  mutation DeleteUserMessage($input: DeleteUserMessageInput!) {
+    deleteUserMessage(input: $input) {
+      id
+    }
+  }
+`;
+
+type UserThreadRecord = {
+  id: string;
+  userId?: string | null;
+  lastMessageAt?: string | null;
+  lastMessageText?: string | null;
+  state?: string | null;
 };
 
-const updateInBatches = async <T>(
-  items: T[],
-  batchSize: number,
-  worker: (item: T) => Promise<void>
-) => {
-  for (let index = 0; index < items.length; index += batchSize) {
-    const batch = items.slice(index, index + batchSize);
-    const results = await Promise.allSettled(
-      batch.map((item) => withRetry(() => worker(item)))
-    );
-    const failures = results.filter((result) => result.status === "rejected");
-    if (failures.length > 0) {
-      throw new Error(`Batch update failed for ${failures.length} items.`);
-    }
-  }
+type UserMessageRecord = {
+  id: string;
+  threadId?: string | null;
+  userId?: string | null;
+  role?: string | null;
+  text?: string | null;
+  createdAt?: string | null;
 };
+
+async function listAllGraphql<T>(
+  token: string,
+  query: string,
+  rootKey: string,
+  filter: Record<string, unknown>,
+): Promise<T[]> {
+  const items: T[] = [];
+  let nextToken: string | null | undefined;
+
+  do {
+    const data = await callDataGraphql<Record<string, { items?: T[]; nextToken?: string | null }>>(
+      token,
+      query,
+      {
+        filter,
+        ...(nextToken ? { nextToken } : {}),
+      },
+    );
+    const page = data[rootKey];
+    items.push(...(page?.items ?? []));
+    nextToken = page?.nextToken;
+  } while (nextToken);
+
+  return items;
+}
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
+      fromUserId?: string;
+      guestAccessToken?: string;
       toUserId?: string;
     };
+    const fromUserId = body.fromUserId?.trim();
+    const guestAccessToken = body.guestAccessToken?.trim();
     const toUserId = body.toUserId?.trim();
 
-    if (!toUserId) {
-      return NextResponse.json({ error: "toUserId is required." }, { status: 400 });
+    if (!fromUserId || !toUserId || !guestAccessToken) {
+      return NextResponse.json(
+        { error: "fromUserId, guestAccessToken and toUserId are required." },
+        { status: 400 },
+      );
     }
 
-    const token = getBearerToken(request);
-    if (!token) {
+    const bearerToken = getBearerToken(request);
+    if (!bearerToken) {
       return NextResponse.json({ error: "Missing bearer token." }, { status: 401 });
     }
-    const payload = await verifyAccessToken(token);
-    const tokenUserId = payload.sub as string | undefined;
-    if (!tokenUserId || tokenUserId !== toUserId) {
+
+    const targetPayload = await verifyAccessToken(bearerToken);
+    const targetUserId = targetPayload.sub as string | undefined;
+    if (!targetUserId || targetUserId !== toUserId) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
 
-    const cookieHeader = request.headers.get("cookie") ?? "";
-    const anonCookie = cookieHeader
-      .split(";")
-      .map((item) => item.trim())
-      .find((item) => item.startsWith(`${getAnonCookieName()}=`));
-    if (!anonCookie) {
-      return NextResponse.json(
-        { error: "Missing anonymous session." },
-        { status: 401 }
-      );
+    const guestPayload = await verifyAccessToken(guestAccessToken);
+    const guestUserId = guestPayload.sub as string | undefined;
+    if (!guestUserId || guestUserId !== fromUserId) {
+      return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
-    const anonValue = anonCookie.split("=").slice(1).join("=");
-    const anonSession = anonValue ? parseAnonCookieValue(anonValue) : null;
-    if (!anonSession) {
-      return NextResponse.json(
-        { error: "Invalid anonymous session." },
-        { status: 401 }
-      );
-    }
-    const fromUserId = anonSession.userId;
 
     if (fromUserId === toUserId) {
-      const response = NextResponse.json({ migrated: false });
-      response.cookies.set(getAnonCookieName(), "", {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: getNodeEnv() === "production",
-        path: "/",
-        maxAge: 0,
-      });
-      return response;
+      return NextResponse.json({ migrated: false });
     }
 
-    const client = getClient();
-
-    const threads = await listAll<Schema["UserThread"]["type"]>(
-      (nextToken) =>
-        client.models.UserThread.list({
-          filter: { userId: { eq: fromUserId } },
-          ...(nextToken ? { nextToken } : {}),
-        }),
+    const threads = await listAllGraphql<UserThreadRecord>(
+      guestAccessToken,
+      listUserThreadsQuery,
+      "listUserThreads",
+      { userId: { eq: fromUserId } },
     );
-    await updateInBatches(threads, 25, async (thread) => {
-      await client.models.UserThread.update({
-        id: thread.id,
-        userId: toUserId,
-        ...(thread.lastMessageAt ? { lastMessageAt: thread.lastMessageAt } : {}),
-        ...(thread.lastMessageText ? { lastMessageText: thread.lastMessageText } : {}),
-        ...(thread.state ? { state: thread.state } : {}),
-      });
-    });
 
-    const messages = await listAll<Schema["UserMessage"]["type"]>(
-      (nextToken) =>
-        client.models.UserMessage.list({
-          filter: { userId: { eq: fromUserId } },
-          ...(nextToken ? { nextToken } : {}),
-        }),
+    for (const thread of threads) {
+      await callDataGraphql(bearerToken, createUserThreadMutation, {
+        input: {
+          id: thread.id,
+          userId: toUserId,
+          ...(thread.lastMessageAt ? { lastMessageAt: thread.lastMessageAt } : {}),
+          ...(thread.lastMessageText ? { lastMessageText: thread.lastMessageText } : {}),
+          state: thread.state ?? "{}",
+        },
+      });
+    }
+
+    const messages = await listAllGraphql<UserMessageRecord>(
+      guestAccessToken,
+      listUserMessagesQuery,
+      "listUserMessages",
+      { userId: { eq: fromUserId } },
     );
-    await updateInBatches(messages, 25, async (message) => {
-      await client.models.UserMessage.update({
-        id: message.id,
-        userId: toUserId,
-        ...(message.threadId ? { threadId: message.threadId } : {}),
-        ...(message.role ? { role: message.role } : {}),
-        ...(message.text ? { text: message.text } : {}),
-        ...(message.createdAt ? { createdAt: message.createdAt } : {}),
+
+    for (const message of messages) {
+      await callDataGraphql(bearerToken, createUserMessageMutation, {
+        input: {
+          id: message.id,
+          threadId: message.threadId,
+          userId: toUserId,
+          role: message.role,
+          text: message.text,
+          createdAt: message.createdAt,
+        },
       });
-    });
+    }
 
-    await client.models.UserProfile.delete({ id: fromUserId });
+    for (const message of messages) {
+      await callDataGraphql(guestAccessToken, deleteUserMessageMutation, {
+        input: { id: message.id },
+      });
+    }
 
-    const response = NextResponse.json({
+    for (const thread of threads) {
+      await callDataGraphql(guestAccessToken, deleteUserThreadMutation, {
+        input: { id: thread.id },
+      });
+    }
+
+    return NextResponse.json({
       migrated: true,
       threads: threads.length,
       messages: messages.length,
     });
-    response.cookies.set(getAnonCookieName(), "", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: getNodeEnv() === "production",
-      path: "/",
-      maxAge: 0,
-    });
-    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

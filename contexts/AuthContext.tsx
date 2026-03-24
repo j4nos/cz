@@ -15,10 +15,12 @@ type AuthContextValue = {
   getAccessToken: () => string | null;
   profile: UserProfile | null;
   isAuthenticated: boolean;
+  isGuest: boolean;
   isAdmin: boolean;
   loading: boolean;
   error: string | null;
   ensureAnonymous: () => Promise<AuthUser>;
+  signInWithGoogle: () => Promise<void>;
   login: (email: string, password: string) => Promise<UserProfile | null>;
   register: (input: {
     email: string;
@@ -45,59 +47,134 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const ANON_KEY = "cityzeen:anon-user-id";
+const GUEST_EMAIL_KEY = "cityzeen:guest-email";
+const GUEST_PASSWORD_KEY = "cityzeen:guest-password";
+const GUEST_USER_ID_KEY = "cityzeen:guest-user-id";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const authClient = useMemo(() => createAuthClient(), []);
   const checkIsAdminUseCase = useMemo(() => new CheckIsAdminUserUseCase(), []);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [anonUser, setAnonUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadProfile(nextUser: AuthUser | null) {
-    if (!nextUser) {
-      setProfile(null);
-      return;
-    }
-
-    const nextProfile = await authClient.getUserProfile(nextUser.uid);
-    setProfile(nextProfile);
-  }
+  const isGuest = profile?.role === "GUEST";
 
   async function refreshSessionState(nextUser: AuthUser | null) {
     setUser(nextUser);
-    await loadProfile(nextUser);
+    let nextProfile = nextUser ? await authClient.getUserProfile(nextUser.uid) : null;
+    if (nextUser && !nextProfile && nextUser.email) {
+      await authClient.upsertUserProfile({
+        uid: nextUser.uid,
+        email: nextUser.email,
+        role: "INVESTOR",
+        country: "HU",
+        investorType: "RETAIL",
+        kycStatus: "not-started",
+      });
+      nextProfile = await authClient.getUserProfile(nextUser.uid);
+    }
+    setProfile(nextProfile);
     setAccessToken(await authClient.getAccessToken());
-    setIsAdmin(nextUser ? await checkIsAdminUseCase.execute() : false);
+    setIsAdmin(nextUser && nextProfile?.role !== "GUEST" ? await checkIsAdminUseCase.execute() : false);
   }
 
-  async function claimAnonymousSession(toUserId: string) {
+  function clearGuestStorage() {
     if (typeof window === "undefined") {
       return;
     }
 
-    const fromUserId = window.localStorage.getItem(ANON_KEY);
-    if (!fromUserId || fromUserId === toUserId) {
+    window.localStorage.removeItem(GUEST_EMAIL_KEY);
+    window.localStorage.removeItem(GUEST_PASSWORD_KEY);
+    window.localStorage.removeItem(GUEST_USER_ID_KEY);
+  }
+
+  async function claimGuestSession(input: {
+    fromUserId: string;
+    guestAccessToken: string;
+    toUserId: string;
+    bearerToken: string;
+  }) {
+    const response = await fetch("/api/chat/claim", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${input.bearerToken}`,
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(payload?.error ?? "Guest chat migration failed.");
+    }
+  }
+
+  async function getGuestClaimContext() {
+    if (!user || profile?.role !== "GUEST") {
+      return null;
+    }
+
+    const guestAccessToken = await authClient.getAccessToken();
+    if (!guestAccessToken) {
+      return null;
+    }
+
+    return {
+      fromUserId: user.uid,
+      guestAccessToken,
+    };
+  }
+
+  async function signOutCurrentGuestIfNeeded() {
+    if (profile?.role !== "GUEST") {
+      return;
+    }
+
+    await authClient.signOut();
+    setUser(null);
+    setProfile(null);
+    setAccessToken(null);
+    setIsAdmin(false);
+  }
+
+  async function ensureGuestProfile(nextUser: AuthUser, email: string) {
+    await authClient.upsertUserProfile({
+      uid: nextUser.uid,
+      email,
+      role: "GUEST",
+      country: "HU",
+      kycStatus: "approved",
+    });
+    await refreshSessionState(nextUser);
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(GUEST_USER_ID_KEY, nextUser.uid);
+    }
+  }
+
+  async function claimAnonymousSession(toUserId: string) {
+    const guestClaim = await getGuestClaimContext();
+    if (!guestClaim) {
+      clearGuestStorage();
       return;
     }
 
     try {
       const token = await authClient.getAccessToken();
-      await fetch("/api/chat/claim", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ toUserId }),
+      if (!token) {
+        return;
+      }
+      await claimGuestSession({
+        ...guestClaim,
+        toUserId,
+        bearerToken: token,
       });
     } finally {
-      window.localStorage.removeItem(ANON_KEY);
-      setAnonUser(null);
+      clearGuestStorage();
     }
   }
 
@@ -107,16 +184,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return current;
     }
 
-    if (anonUser) {
-      return anonUser;
-    }
-
     if (typeof window !== "undefined") {
-      const cached = window.localStorage.getItem(ANON_KEY);
-      if (cached) {
-        const nextAnonUser = { uid: cached };
-        setAnonUser(nextAnonUser);
-        return nextAnonUser;
+      const cachedEmail = window.localStorage.getItem(GUEST_EMAIL_KEY);
+      const cachedPassword = window.localStorage.getItem(GUEST_PASSWORD_KEY);
+      if (cachedEmail && cachedPassword) {
+        try {
+          const nextUser = await authClient.signInWithEmailAndPassword(cachedEmail, cachedPassword);
+          await ensureGuestProfile(nextUser, cachedEmail);
+          return nextUser;
+        } catch {
+          clearGuestStorage();
+        }
       }
     }
 
@@ -124,31 +202,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!response.ok) {
       throw new Error("Failed to start anonymous session.");
     }
-    const data = (await response.json()) as { userId?: string };
-    if (!data.userId) {
-      throw new Error("Anonymous session missing user id.");
+    const data = (await response.json()) as { email?: string; password?: string };
+    if (!data.email || !data.password) {
+      throw new Error("Guest session is incomplete.");
     }
 
-    const nextAnonUser = { uid: data.userId };
+    const nextUser = await authClient.signInWithEmailAndPassword(data.email, data.password);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(ANON_KEY, data.userId);
+      window.localStorage.setItem(GUEST_EMAIL_KEY, data.email);
+      window.localStorage.setItem(GUEST_PASSWORD_KEY, data.password);
+      window.localStorage.setItem(GUEST_USER_ID_KEY, nextUser.uid);
     }
-    setAnonUser(nextAnonUser);
-    return nextAnonUser;
+    await ensureGuestProfile(nextUser, data.email);
+    return nextUser;
   }
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const cachedAnonId = window.localStorage.getItem(ANON_KEY);
-    if (!cachedAnonId || user) {
-      return;
-    }
-
-    setAnonUser({ uid: cachedAnonId });
-  }, [user]);
 
   useEffect(() => {
     let active = true;
@@ -184,29 +251,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      activeUser: user ?? anonUser,
-      getActiveUser: () => authClient.getCurrentUser() ?? anonUser,
+      activeUser: user,
+      getActiveUser: () => authClient.getCurrentUser(),
       accessToken,
       getAccessToken: () => accessToken,
       profile,
-      isAuthenticated: Boolean(user),
+      isAuthenticated: Boolean(user && profile?.role !== "GUEST"),
+      isGuest,
       isAdmin,
       loading,
       error,
       ensureAnonymous,
+      signInWithGoogle: async () => {
+        setError(null);
+        await authClient.signInWithGoogle();
+      },
       login: async (email, password) => {
         setError(null);
         setLoading(true);
         try {
+          const guestClaim = await getGuestClaimContext();
+          await signOutCurrentGuestIfNeeded();
           const nextUser = await authClient.signInWithEmailAndPassword(email, password);
-          const nextProfile = await authClient.getUserProfile(nextUser.uid);
-
-          setUser(nextUser);
-          setProfile(nextProfile);
-          setAccessToken(await authClient.getAccessToken());
-          setIsAdmin(await checkIsAdminUseCase.execute());
-          await claimAnonymousSession(nextUser.uid);
-          return nextProfile;
+          await refreshSessionState(nextUser);
+          if (guestClaim) {
+            const bearerToken = await authClient.getAccessToken();
+            if (bearerToken) {
+              await claimGuestSession({
+                ...guestClaim,
+                toUserId: nextUser.uid,
+                bearerToken,
+              });
+            }
+          }
+          clearGuestStorage();
+          return await authClient.getUserProfile(nextUser.uid);
         } catch (nextError) {
           setError(nextError instanceof Error ? nextError.message : "Login failed.");
           throw nextError;
@@ -219,6 +298,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(true);
 
         try {
+          const guestClaim = await getGuestClaimContext();
+          await signOutCurrentGuestIfNeeded();
           const result = await authClient.createUserWithEmailAndPassword(email, password);
 
           if (result.user) {
@@ -231,7 +312,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               companyName: role === "ASSET_PROVIDER" ? "Cityzeen Assets" : undefined,
             });
             await refreshSessionState(result.user);
-            await claimAnonymousSession(result.user.uid);
+            if (guestClaim) {
+              const bearerToken = await authClient.getAccessToken();
+              if (bearerToken) {
+                await claimGuestSession({
+                  ...guestClaim,
+                  toUserId: result.user.uid,
+                  bearerToken,
+                });
+              }
+            }
+            clearGuestStorage();
             return { needsConfirmation: result.needsConfirmation, profile: await authClient.getUserProfile(result.user.uid) };
           }
 
@@ -247,6 +338,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(null);
         setLoading(true);
         try {
+          const guestClaim = await getGuestClaimContext();
+          await signOutCurrentGuestIfNeeded();
           await authClient.confirmUserSignUp(email, code);
           const nextUser = await authClient.signInWithEmailAndPassword(email, password);
           await authClient.upsertUserProfile({
@@ -257,13 +350,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             investorType: role === "INVESTOR" ? "PROFESSIONAL" : undefined,
             companyName: role === "ASSET_PROVIDER" ? "Cityzeen Assets" : undefined,
           });
-          const nextProfile = await authClient.getUserProfile(nextUser.uid);
-          setUser(nextUser);
-          setProfile(nextProfile);
-          setAccessToken(await authClient.getAccessToken());
-          setIsAdmin(await checkIsAdminUseCase.execute());
-          await claimAnonymousSession(nextUser.uid);
-          return nextProfile;
+          await refreshSessionState(nextUser);
+          if (guestClaim) {
+            const bearerToken = await authClient.getAccessToken();
+            if (bearerToken) {
+              await claimGuestSession({
+                ...guestClaim,
+                toUserId: nextUser.uid,
+                bearerToken,
+              });
+            }
+          }
+          clearGuestStorage();
+          return await authClient.getUserProfile(nextUser.uid);
         } catch (nextError) {
           setError(nextError instanceof Error ? nextError.message : "Confirmation failed.");
           throw nextError;
@@ -303,6 +402,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(true);
         try {
           await authClient.signOut();
+          clearGuestStorage();
           setUser(null);
           setProfile(null);
           setAccessToken(null);
@@ -312,10 +412,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       },
       refreshProfile: async () => {
-        await loadProfile(authClient.getCurrentUser());
+        await refreshSessionState(authClient.getCurrentUser());
       },
     }),
-    [accessToken, anonUser, authClient, checkIsAdminUseCase, error, isAdmin, loading, profile, user],
+    [accessToken, authClient, checkIsAdminUseCase, error, isAdmin, isGuest, loading, profile, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -341,7 +441,7 @@ export function usePrivateAuth() {
     throw new Error("Private auth hook used before auth finished loading.");
   }
 
-  if (!context.user) {
+  if (!context.user || !context.isAuthenticated) {
     throw new Error("Private auth hook used without authenticated user.");
   }
 

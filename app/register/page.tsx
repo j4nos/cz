@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 import { SectionContainer } from "@/components/sections/SectionContainer";
 import { AppLink } from "@/components/ui/AppLink";
@@ -11,14 +11,31 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterContent />
+    </Suspense>
+  );
+}
+
+function RegisterContent() {
   const router = useRouter();
-  const { register, confirmRegistration, loading } = useAuth();
+  const searchParams = useSearchParams();
+  const { register, confirmRegistration, signInWithGoogle, loading, isAuthenticated } = useAuth();
   const { setToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [codeEnabled, setCodeEnabled] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const nextHref = searchParams.get("next") || "/";
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace(nextHref);
+    }
+  }, [isAuthenticated, nextHref, router]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,7 +57,7 @@ export default function RegisterPage() {
           role: "INVESTOR",
           country: "HU",
         });
-        router.push("/");
+        router.push(nextHref);
         return;
       }
 
@@ -55,7 +72,7 @@ export default function RegisterPage() {
         setToast("Enter the confirmation code from your email.", "success", 3000);
         return;
       }
-      router.push("/");
+      router.push(nextHref);
     } catch (err) {
       const errorMessage =
         err &&
@@ -70,6 +87,23 @@ export default function RegisterPage() {
       setToast(message, "danger", 2500);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleLogin() {
+    setGoogleSubmitting(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      const errorMessage =
+        err &&
+        typeof err === "object" &&
+        "message" in err &&
+        typeof err.message === "string"
+          ? err.message
+          : null;
+      setToast(errorMessage ?? "Google login failed", "danger", 2500);
+      setGoogleSubmitting(false);
     }
   }
 
@@ -116,6 +150,14 @@ export default function RegisterPage() {
         ) : null}
         <Button type="submit" disabled={submitting || loading}>
           {submitting ? "Creating..." : "Register"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={googleSubmitting || loading}
+          onClick={handleGoogleLogin}
+        >
+          {googleSubmitting ? "Redirecting..." : "Continue with Google"}
         </Button>
       </Form>
       <br />

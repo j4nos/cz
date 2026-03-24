@@ -1,4 +1,4 @@
-export type UserRole = "ASSET_PROVIDER" | "INVESTOR" | "platform-admin";
+export type UserRole = "ASSET_PROVIDER" | "INVESTOR" | "platform-admin" | "GUEST";
 export type InvestorType = "RETAIL" | "PROFESSIONAL";
 export type EligibleInvestorType = InvestorType | "ANY";
 

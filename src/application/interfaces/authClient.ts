@@ -14,6 +14,7 @@ export type AuthClient = {
   onAuthStateChanged: (handler: (user: AuthUser | null) => void) => () => void;
   getAccessToken: () => Promise<string | null>;
   signInWithEmailAndPassword: (email: string, password: string) => Promise<AuthUser>;
+  signInWithGoogle: () => Promise<void>;
   createUserWithEmailAndPassword: (email: string, password: string) => Promise<RegisterResult>;
   confirmUserSignUp: (email: string, code: string) => Promise<void>;
   resendConfirmationCode: (email: string) => Promise<void>;
