@@ -12,6 +12,7 @@ import {
   FormTextarea,
 } from "@/components/ui/Form";
 import { KeyValueList } from "@/components/ui/KeyValueList";
+import { useCouponPreview } from "@/components/useCouponPreview";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLoading } from "@/contexts/LoadingContext";
 import { useToast } from "@/contexts/ToastContext";
@@ -21,6 +22,7 @@ import {
   isBankTransferAvailable,
   type CheckoutPaymentType,
 } from "@/src/application/use-cases/checkoutRules";
+import type { CouponPreview } from "@/src/application/dto/couponPreview";
 import { CheckoutService } from "@/src/application/use-cases/checkoutService";
 import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
 import { createOrderController } from "@/src/infrastructure/controllers/createOrderController";
@@ -163,8 +165,15 @@ export function Invest({
 
   const hasSingleProduct = products.length === 1;
   const parsedQty = Number(quantity || 0);
-  const baseUnitPrice = selectedProduct?.unitPrice ?? 0;
-  const total = baseUnitPrice * parsedQty;
+  const couponPreview: CouponPreview | null = useCouponPreview({
+    productId: selectedProduct?.id,
+    unitPrice: selectedProduct?.unitPrice,
+    quantity: parsedQty,
+    coupon,
+  });
+  const baseUnitPrice = couponPreview?.baseUnitPrice ?? selectedProduct?.unitPrice ?? 0;
+  const effectiveUnitPrice = couponPreview?.effectiveUnitPrice ?? selectedProduct?.unitPrice ?? 0;
+  const total = couponPreview?.total ?? effectiveUnitPrice * parsedQty;
   const powensEnabled = isBankTransferAvailable(asset);
   const paymentOptions = getCheckoutPaymentOptions(asset);
 
@@ -184,6 +193,8 @@ export function Invest({
         asset,
         product: selectedProduct,
         quantity: parsedQty,
+        coupon,
+        notes,
         paymentType,
         activeUserId: activeUser?.uid,
         authLoading,
@@ -322,8 +333,18 @@ export function Invest({
             </FormField>
             <p>
               Unit: {selectedProduct?.currency ?? listing.currency}{" "}
-              {baseUnitPrice}
+              {effectiveUnitPrice}
             </p>
+            {couponPreview?.isCouponValid ? (
+              <p className="muted">
+                Coupon applied: {couponPreview.couponCodeApplied} from{" "}
+                {selectedProduct?.currency ?? listing.currency} {baseUnitPrice} to{" "}
+                {selectedProduct?.currency ?? listing.currency} {effectiveUnitPrice}
+              </p>
+            ) : null}
+            {couponPreview?.hasCouponInput && !couponPreview.isCouponValid ? (
+              <p className="muted">{couponPreview.message ?? "Coupon code not found for this product."}</p>
+            ) : null}
             <p>
               Total: {selectedProduct?.currency ?? listing.currency}{" "}
               {Number.isFinite(total) ? total.toFixed(2) : "0.00"}

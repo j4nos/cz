@@ -1,6 +1,7 @@
 import type { BlogPost } from "@/src/domain/entities/content";
 import type { Product } from "@/src/domain/entities";
 import type { PublicContentReader, PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
+import { stripProductCoupons } from "@/src/application/use-cases/productCoupons";
 
 type PublicContentRepository = {
   listListings(): Promise<PublicListingWithAsset["listing"][]>;
@@ -51,11 +52,13 @@ export class AmplifyPublicContentReader implements PublicContentReader {
   }
 
   async listProductsByListingId(listingId: string): Promise<Product[]> {
-    return this.repository.listProductsByListingId(listingId);
+    const products = await this.repository.listProductsByListingId(listingId);
+    return products.map(stripProductCoupons);
   }
 
   async getProductById(productId: string): Promise<Product | null> {
-    return this.repository.getProductById(productId);
+    const product = await this.repository.getProductById(productId);
+    return product ? stripProductCoupons(product) : null;
   }
 
   async getOrderById(orderId: string) {

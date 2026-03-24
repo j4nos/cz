@@ -181,6 +181,7 @@ export default function AssetProviderOrdersPage() {
               <td>{order.quantity}</td>
               <td>
                 {order.currency} {order.total}
+                {order.coupon ? ` (${order.coupon})` : ""}
               </td>
               <td className="muted">{formatDate(order.createdAt)}</td>
               <td>

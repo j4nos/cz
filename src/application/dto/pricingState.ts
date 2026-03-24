@@ -1,4 +1,4 @@
-import type { Product } from "@/src/domain/entities";
+import type { Product, ProductCoupon } from "@/src/domain/entities";
 
 export interface PricingTier {
   id: string;
@@ -17,6 +17,7 @@ export interface ProductPricingState {
   eligibleInvestorType: string;
   supplyTotal: number;
   tiers: PricingTier[];
+  coupons: ProductCoupon[];
 }
 
 export function createDefaultPricingState(product: Product | undefined, listingId: string): ProductPricingState {
@@ -37,5 +38,6 @@ export function createDefaultPricingState(product: Product | undefined, listingI
         discountPercent: 0,
       },
     ],
+    coupons: product?.coupons ?? [],
   };
 }

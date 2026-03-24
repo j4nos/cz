@@ -1,6 +1,7 @@
 import type { Schema } from "@/amplify/data/resource";
 import type { AssetDocument, BlogPost } from "@/src/domain/entities/content";
-import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
+import type { Asset, Listing, Order, Product, ProductCoupon, UserProfile } from "@/src/domain/entities";
+import { sanitizeProductCoupons } from "@/src/application/use-cases/productCoupons";
 import { toPublicStorageUrl, toPublicStorageUrls } from "@/src/infrastructure/storage/publicUrls";
 
 function normalizeAssetStatus(value?: string): Asset["status"] {
@@ -100,7 +101,17 @@ export function mapListingRecord(item: Schema["Listing"]["type"]): Listing {
   };
 }
 
-export function mapProductRecord(item: Schema["Product"]["type"]): Product {
+export function mapProductCouponRecord(item: Schema["ProductCoupon"]["type"]): ProductCoupon {
+  return {
+    code: item.code ?? "",
+    discountedUnitPrice: Number(item.discountedUnitPrice ?? 0),
+  };
+}
+
+export function mapProductRecord(
+  item: Schema["Product"]["type"],
+  coupons: Array<Partial<ProductCoupon> | null | undefined> = [],
+): Product {
   return {
     id: item.id,
     listingId: item.listingId ?? "",
@@ -112,6 +123,7 @@ export function mapProductRecord(item: Schema["Product"]["type"]): Product {
     eligibleInvestorType: item.eligibleInvestorType ?? "ANY",
     supplyTotal: Number(item.supplyTotal ?? 0),
     remainingSupply: Number(item.remainingSupply ?? 0),
+    coupons: sanitizeProductCoupons(coupons),
   };
 }
 
@@ -129,6 +141,7 @@ export function mapOrderRecord(item: Schema["Order"]["type"]): Order {
     discountPctApplied: item.discountPctApplied == null ? undefined : Number(item.discountPctApplied),
     effectiveUnitPrice: item.effectiveUnitPrice == null ? undefined : Number(item.effectiveUnitPrice),
     description: item.description ?? undefined,
+    notes: item.description ?? undefined,
     total: Number(item.total ?? 0),
     status: normalizeOrderStatus(item.status ?? undefined),
     currency: item.currency ?? "EUR",

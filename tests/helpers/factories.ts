@@ -66,6 +66,7 @@ export function makeProduct(overrides: Partial<Product> = {}): Product {
     eligibleInvestorType: "ANY",
     supplyTotal: 100,
     remainingSupply: 100,
+    coupons: [],
     ...overrides,
   };
 }
@@ -79,6 +80,8 @@ export function makeOrder(overrides: Partial<Order> = {}): Order {
     productId: "product-1",
     quantity: 2,
     unitPrice: 100,
+    baseUnitPrice: 100,
+    effectiveUnitPrice: 100,
     total: 200,
     status: "pending",
     currency: "EUR",

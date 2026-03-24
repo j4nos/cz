@@ -23,6 +23,8 @@ type SubmitCheckoutInput = {
   asset: Asset | null;
   product: Product | null;
   quantity: number;
+  coupon?: string;
+  notes?: string;
   paymentType: CheckoutPaymentType;
   activeUserId?: string;
   authLoading: boolean;
@@ -111,6 +113,8 @@ export class CheckoutService {
       listingId: input.listing.id,
       productId: input.product.id,
       quantity: input.quantity,
+      coupon: input.coupon,
+      notes: input.notes,
       paymentProvider: input.paymentType,
     });
 

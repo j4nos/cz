@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { PlainCta } from "@/components/sections/PlainCta";
@@ -21,6 +21,7 @@ import {
   getPricingTierInputError,
   removePricingTierFromState,
 } from "@/src/application/use-cases/pricingRules";
+import { normalizeCouponCode } from "@/src/application/use-cases/productCoupons";
 import {
   type PricingTier,
   type ProductPricingState,
@@ -51,6 +52,8 @@ export function PricingEditor({
   const [state, setState] = useState<ProductPricingState | null>(null);
   const [minQuantity, setMinQuantity] = useState("1");
   const [discountPercent, setDiscountPercent] = useState("0");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponPrice, setCouponPrice] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -73,6 +76,26 @@ export function PricingEditor({
     setState((current) => (current ? { ...current, [key]: value } : current));
   }
 
+  async function persistState(nextState: ProductPricingState) {
+    const saved = await createPricingController().savePricingState(nextState);
+    setState(saved);
+    await fetch("/api/asset-provider/revalidate-listings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ listingId }),
+    });
+    if (saved.productId) {
+      const nextProductPath = `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${saved.productId}`;
+      if (nextProductPath !== currentProductPath) {
+        router.replace(nextProductPath);
+      }
+    }
+    return saved;
+  }
+
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!state) {
@@ -87,23 +110,8 @@ export function PricingEditor({
 
     try {
       setError("");
-      const saved = await createPricingController().savePricingState(state);
-      setState(saved);
-      await fetch("/api/asset-provider/revalidate-listings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({ listingId }),
-      });
+      const saved = await persistState(state);
       setToast(saved.productId ? "Product saved." : "Product created.", "success", 2000);
-      if (saved.productId) {
-        const nextProductPath = `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${saved.productId}`;
-        if (nextProductPath !== currentProductPath) {
-          router.replace(nextProductPath);
-        }
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cannot save product.");
     }
@@ -142,6 +150,86 @@ export function PricingEditor({
   function handleRemoveTier(tierId: string) {
     setState((current) => (current ? removePricingTierFromState(current, tierId) : current));
     setToast("Pricing tier removed.", "success", 2000);
+  }
+
+  async function handleAddCoupon(event?: FormEvent) {
+    event?.preventDefault();
+    if (!state) {
+      return;
+    }
+
+    const nextCode = normalizeCouponCode(couponCode);
+    const nextPrice = Number(couponPrice);
+
+    if (!nextCode) {
+      const message = "Coupon code is required.";
+      setError(message);
+      setToast(message, "danger", 2200);
+      return;
+    }
+    if (!Number.isFinite(nextPrice) || nextPrice < 0) {
+      const message = "Coupon price must be a valid non-negative number.";
+      setError(message);
+      setToast(message, "danger", 2200);
+      return;
+    }
+    if (nextPrice >= state.unitPrice) {
+      const message = "Coupon price must be lower than the base unit price.";
+      setError(message);
+      setToast(message, "danger", 2200);
+      return;
+    }
+    if (state.coupons.some((coupon) => coupon.code === nextCode)) {
+      const message = "Coupon code already exists for this product.";
+      setError(message);
+      setToast(message, "danger", 2200);
+      return;
+    }
+
+    setError("");
+    const nextState = {
+      ...state,
+      coupons: [...state.coupons, { code: nextCode, discountedUnitPrice: nextPrice }],
+    };
+    setState(nextState);
+    if (nextState.productId) {
+      try {
+        await persistState(nextState);
+      } catch (err) {
+        setState(state);
+        const message = err instanceof Error ? err.message : "Cannot save coupon.";
+        setError(message);
+        setToast(message, "danger", 2600);
+        return;
+      }
+    }
+    setCouponCode("");
+    setCouponPrice("");
+    setToast("Coupon added.", "success", 2000);
+  }
+
+  async function handleRemoveCoupon(code: string) {
+    if (!state) {
+      return;
+    }
+
+    const nextState = {
+      ...state,
+      coupons: state.coupons.filter((coupon) => coupon.code !== code),
+    };
+    setState(nextState);
+    if (nextState.productId) {
+      try {
+        await persistState(nextState);
+      } catch (err) {
+        setState(state);
+        const message = err instanceof Error ? err.message : "Cannot remove coupon.";
+        setError(message);
+        setToast(message, "danger", 2600);
+        return;
+      }
+    }
+    setToast("Coupon removed.", "success", 2000);
   }
 
   async function handleDeleteProduct(
@@ -304,6 +392,32 @@ export function PricingEditor({
           </FormField>
           <Button type="submit">Add tier</Button>
         </Form>
+
+        <br />
+
+        <Form onSubmit={handleAddCoupon}>
+          <FormField label="Coupon code" htmlFor="product-coupon-code">
+            <FormInput
+              id="product-coupon-code"
+              value={couponCode}
+              onChange={(event) => setCouponCode(event.target.value)}
+              placeholder="SPRING24"
+            />
+          </FormField>
+          <FormField label="Discounted unit price" htmlFor="product-coupon-price">
+            <FormInput
+              id="product-coupon-price"
+              type="number"
+              min="0"
+              value={couponPrice}
+              onChange={(event) => setCouponPrice(event.target.value)}
+              placeholder="850"
+            />
+          </FormField>
+          <Button type="button" onClick={handleAddCoupon}>
+            Add coupon
+          </Button>
+        </Form>
       </section>
 
       <section>
@@ -335,6 +449,43 @@ export function PricingEditor({
             {state.tiers.length === 0 ? (
               <tr>
                 <td colSpan={3}>No tiers yet.</td>
+              </tr>
+            ) : null}
+          </tbody>
+        </Table>
+      </section>
+
+      <section>
+        <h3>Coupons</h3>
+        <Table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Discounted price</th>
+              <th>Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.coupons.map((coupon) => (
+              <tr key={coupon.code}>
+                <td>{coupon.code}</td>
+                <td>
+                  {state.currency} {coupon.discountedUnitPrice}
+                </td>
+                <td>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => handleRemoveCoupon(coupon.code)}
+                  >
+                    Remove
+                  </Button>
+                </td>
+              </tr>
+            ))}
+            {state.coupons.length === 0 ? (
+              <tr>
+                <td colSpan={3}>No coupons yet.</td>
               </tr>
             ) : null}
           </tbody>

@@ -137,7 +137,11 @@ describe("InvestmentPlatformService", () => {
   it("creates pending orders for valid inputs", async () => {
     const repository = new FakeRepository();
     repository.user = makeUserProfile({ id: "investor-1", investorType: "PRO" });
-    repository.product = makeProduct({ eligibleInvestorType: "PRO", unitPrice: 250 });
+    repository.product = makeProduct({
+      eligibleInvestorType: "PRO",
+      unitPrice: 250,
+      coupons: [{ code: "VIP50", discountedUnitPrice: 200 }],
+    });
     const service = new InvestmentPlatformService(repository, new FixedIdGenerator(), new FixedClock());
 
     const order = await service.startOrder({
@@ -145,11 +149,43 @@ describe("InvestmentPlatformService", () => {
       listingId: "listing-1",
       productId: "product-1",
       quantity: 3,
+      coupon: "vip50",
+      notes: "Investor note",
       paymentProvider: "bank-transfer",
     });
 
-    expect(order).toMatchObject({ status: "pending", total: 750, paymentProvider: "bank-transfer" });
-    expect(repository.createdOrder).toMatchObject({ providerUserId: "provider-1", total: 750 });
+    expect(order).toMatchObject({
+      status: "pending",
+      total: 600,
+      paymentProvider: "bank-transfer",
+      coupon: "VIP50",
+      notes: "Investor note",
+    });
+    expect(repository.createdOrder).toMatchObject({
+      providerUserId: "provider-1",
+      total: 600,
+      baseUnitPrice: 250,
+      effectiveUnitPrice: 200,
+      notes: "Investor note",
+    });
+  });
+
+  it("rejects invalid coupons", async () => {
+    const repository = new FakeRepository();
+    repository.product = makeProduct({ coupons: [{ code: "VIP50", discountedUnitPrice: 80 }] });
+    const service = new InvestmentPlatformService(repository, new FixedIdGenerator(), new FixedClock());
+
+    await expect(
+      service.startOrder({
+        investorId: "investor-1",
+        listingId: "listing-1",
+        productId: "product-1",
+        quantity: 2,
+        coupon: "unknown",
+      }),
+    ).rejects.toMatchObject({
+      message: "Coupon code is not valid for this product.",
+    });
   });
 
   it("only completes pending orders and decrements remaining supply", async () => {

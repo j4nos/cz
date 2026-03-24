@@ -117,6 +117,7 @@ export const demoProducts: Product[] = [
     eligibleInvestorType: "PROFESSIONAL",
     supplyTotal: 50,
     remainingSupply: 47,
+    coupons: [{ code: "SPRING24", discountedUnitPrice: 900 }],
   },
   {
     id: "product-2",
@@ -129,6 +130,7 @@ export const demoProducts: Product[] = [
     eligibleInvestorType: "ANY",
     supplyTotal: 120,
     remainingSupply: 120,
+    coupons: [],
   },
 ];
 

@@ -73,6 +73,12 @@ export interface Product {
   eligibleInvestorType: string;
   supplyTotal: number;
   remainingSupply: number;
+  coupons: ProductCoupon[];
+}
+
+export interface ProductCoupon {
+  code: string;
+  discountedUnitPrice: number;
 }
 
 export interface Order {
@@ -88,6 +94,7 @@ export interface Order {
   discountPctApplied?: number;
   effectiveUnitPrice?: number;
   description?: string;
+  notes?: string;
   total: number;
   status: OrderStatus;
   currency: string;

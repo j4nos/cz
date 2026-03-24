@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReadPort } from "@/src/application/interfaces/readPort";
+import { stripProductCoupons } from "@/src/application/use-cases/productCoupons";
 
 type ReadRepository = Pick<
   ReadPort,
@@ -41,11 +42,13 @@ export class AmplifyReadController implements ReadPort {
   }
 
   async listProductsByListingId(listingId: string) {
-    return this.repository.listProductsByListingId(listingId);
+    const products = await this.repository.listProductsByListingId(listingId);
+    return products.map(stripProductCoupons);
   }
 
   async getProductById(productId: string) {
-    return this.repository.getProductById(productId);
+    const product = await this.repository.getProductById(productId);
+    return product ? stripProductCoupons(product) : null;
   }
 
   async listOrdersByInvestor(investorId: string) {

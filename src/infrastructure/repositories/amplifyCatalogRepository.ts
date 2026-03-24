@@ -1,7 +1,11 @@
 import type { Schema } from "@/amplify/data/resource";
 import type { Listing, Product } from "@/src/domain/entities";
 import { listAll } from "@/src/infrastructure/amplify/pagination";
-import { mapListingRecord, mapProductRecord } from "@/src/infrastructure/amplify/schemaMappers";
+import {
+  mapListingRecord,
+  mapProductCouponRecord,
+  mapProductRecord,
+} from "@/src/infrastructure/amplify/schemaMappers";
 import type {
   AmplifyDataClient,
   AmplifyReadAuthMode,
@@ -18,6 +22,71 @@ export class AmplifyCatalogRepository {
       ...(input ?? {}),
       ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
     };
+  }
+
+  private get productCouponModel() {
+    return (this.client.models as typeof this.client.models & {
+      ProductCoupon?: {
+        list: AmplifyDataClient["models"]["Product"]["list"];
+        create: AmplifyDataClient["models"]["Product"]["create"];
+        delete: AmplifyDataClient["models"]["Product"]["delete"];
+      };
+    }).ProductCoupon;
+  }
+
+  private assertCouponModelAvailableForWrite(product: Product) {
+    if (this.productCouponModel || product.coupons.length === 0) {
+      return;
+    }
+
+    throw new Error("Coupon storage is not deployed yet. Deploy the latest Amplify schema before saving coupons.");
+  }
+
+  private async listCouponsByProductId(productId: string) {
+    const productCouponModel = this.productCouponModel;
+    if (!productCouponModel) {
+      return [];
+    }
+
+    const records = await listAll<Schema["ProductCoupon"]["type"]>((nextToken) =>
+      productCouponModel.list({
+        filter: { productId: { eq: productId } },
+        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+        ...(nextToken ? { nextToken } : {}),
+      }),
+    );
+
+    return records.map(mapProductCouponRecord);
+  }
+
+  private async replaceCoupons(product: Product) {
+    const productCouponModel = this.productCouponModel;
+    this.assertCouponModelAvailableForWrite(product);
+    if (!productCouponModel) {
+      return;
+    }
+
+    const existing = await listAll<Schema["ProductCoupon"]["type"]>((nextToken) =>
+      productCouponModel.list({
+        filter: { productId: { eq: product.id } },
+        ...(nextToken ? { nextToken } : {}),
+      }),
+    );
+
+    await Promise.all(
+      existing.map((coupon) => productCouponModel.delete({ id: coupon.id })),
+    );
+
+    await Promise.all(
+      product.coupons.map((coupon) =>
+        productCouponModel.create({
+          id: `${product.id}:${coupon.code}`,
+          productId: product.id,
+          code: coupon.code,
+          discountedUnitPrice: coupon.discountedUnitPrice,
+        }),
+      ),
+    );
   }
 
   async createListing(input: Listing): Promise<Listing> {
@@ -90,8 +159,9 @@ export class AmplifyCatalogRepository {
       supplyTotal: input.supplyTotal,
       remainingSupply: input.remainingSupply,
     });
-
-    return response.data ? mapProductRecord(response.data) : input;
+    const product = response.data ? mapProductRecord(response.data, input.coupons) : input;
+    await this.replaceCoupons(product);
+    return product;
   }
 
   async getProductById(id: string): Promise<Product | null> {
@@ -99,7 +169,12 @@ export class AmplifyCatalogRepository {
       { id },
       this.withReadAuth(),
     );
-    return response.data ? mapProductRecord(response.data) : null;
+    if (!response.data) {
+      return null;
+    }
+
+    const coupons = await this.listCouponsByProductId(response.data.id);
+    return mapProductRecord(response.data, coupons);
   }
 
   async updateProduct(product: Product): Promise<Product> {
@@ -114,11 +189,24 @@ export class AmplifyCatalogRepository {
       supplyTotal: product.supplyTotal,
       remainingSupply: product.remainingSupply,
     });
-
-    return response.data ? mapProductRecord(response.data) : product;
+    const saved = response.data ? mapProductRecord(response.data, product.coupons) : product;
+    await this.replaceCoupons(saved);
+    return saved;
   }
 
   async deleteProduct(productId: string): Promise<void> {
+    const productCouponModel = this.productCouponModel;
+    if (productCouponModel) {
+      const existingCoupons = await listAll<Schema["ProductCoupon"]["type"]>((nextToken) =>
+        productCouponModel.list({
+          filter: { productId: { eq: productId } },
+          ...(nextToken ? { nextToken } : {}),
+        }),
+      );
+      await Promise.all(
+        existingCoupons.map((coupon) => productCouponModel.delete({ id: coupon.id })),
+      );
+    }
     await this.client.models.Product.delete({ id: productId });
   }
 
@@ -130,6 +218,11 @@ export class AmplifyCatalogRepository {
         ...(nextToken ? { nextToken } : {}),
       }),
     );
-    return records.map(mapProductRecord);
+    return Promise.all(
+      records.map(async (record) => {
+        const coupons = await this.listCouponsByProductId(record.id);
+        return mapProductRecord(record, coupons);
+      }),
+    );
   }
 }

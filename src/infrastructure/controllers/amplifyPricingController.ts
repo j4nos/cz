@@ -43,6 +43,7 @@ export class AmplifyPricingController implements PricingPort {
         eligibleInvestorType: state.eligibleInvestorType,
         supplyTotal: state.supplyTotal,
         remainingSupply: Math.min(existingProduct.remainingSupply, state.supplyTotal),
+        coupons: state.coupons,
       });
       return { ...state, productId: existingProduct.id };
     }
@@ -58,6 +59,7 @@ export class AmplifyPricingController implements PricingPort {
       eligibleInvestorType: state.eligibleInvestorType,
       supplyTotal: state.supplyTotal,
       remainingSupply: state.supplyTotal,
+      coupons: state.coupons,
     });
 
     return { ...state, productId: created.id };

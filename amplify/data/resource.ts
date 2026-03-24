@@ -101,7 +101,17 @@ const schema = a.schema({
       remainingSupply: a.integer().required(),
       listing: a.belongsTo("Listing", "listingId"),
       pricingTiers: a.hasMany("PricingTier", "productId"),
+      coupons: a.hasMany("ProductCoupon", "productId"),
       orders: a.hasMany("Order", "productId"),
+    })
+    .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
+
+  ProductCoupon: a
+    .model({
+      productId: a.id().required(),
+      code: a.string().required(),
+      discountedUnitPrice: a.float().required(),
+      product: a.belongsTo("Product", "productId"),
     })
     .authorization((allow) => [allow.publicApiKey().to(['read']), allow.owner()]),
 

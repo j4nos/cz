@@ -6,6 +6,8 @@ export interface OrderPort {
     listingId: string;
     productId: string;
     quantity: number;
+    coupon?: string;
+    notes?: string;
     paymentProvider?: string;
     investorWalletAddress?: string;
   }) => Promise<Order>;

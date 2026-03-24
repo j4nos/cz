@@ -1,5 +1,6 @@
 import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
 import type { Asset, Listing, Order, Product, UserProfile } from "@/src/domain/entities";
+import { getCouponPricing, normalizeCouponCode } from "@/src/application/use-cases/productCoupons";
 import { DomainError } from "@/src/domain/value-objects/errors";
 
 export interface IdGenerator {
@@ -98,6 +99,7 @@ export class InvestmentPlatformService {
     maxPurchase: number;
     eligibleInvestorType: string;
     supplyTotal: number;
+    coupons?: Product["coupons"];
   }): Promise<Product> {
     const listing = await this.requireListing(input.listingId);
 
@@ -120,6 +122,7 @@ export class InvestmentPlatformService {
       eligibleInvestorType: input.eligibleInvestorType,
       supplyTotal: input.supplyTotal,
       remainingSupply: input.supplyTotal,
+      coupons: input.coupons ?? [],
     });
   }
 
@@ -128,6 +131,8 @@ export class InvestmentPlatformService {
     listingId: string;
     productId: string;
     quantity: number;
+    coupon?: string;
+    notes?: string;
     paymentProvider?: string;
     investorWalletAddress?: string;
   }): Promise<Order> {
@@ -160,6 +165,12 @@ export class InvestmentPlatformService {
     }
 
     const asset = await this.requireAsset(listing.assetId);
+    const couponPricing = getCouponPricing(product, input.coupon);
+    const normalizedCoupon = normalizeCouponCode(input.coupon);
+
+    if (normalizedCoupon && !couponPricing.isCouponValid) {
+      throw new DomainError({ code: "INVALID_COUPON", message: "Coupon code is not valid for this product." });
+    }
 
     return this.repository.createOrder({
       id: this.idGenerator.next(),
@@ -168,11 +179,17 @@ export class InvestmentPlatformService {
       listingId: listing.id,
       productId: product.id,
       quantity: input.quantity,
-      unitPrice: product.unitPrice,
-      total: product.unitPrice * input.quantity,
+      unitPrice: couponPricing.effectiveUnitPrice,
+      baseUnitPrice: product.unitPrice,
+      discountPctApplied: couponPricing.discountPctApplied,
+      effectiveUnitPrice: couponPricing.effectiveUnitPrice,
+      description: input.notes?.trim() || undefined,
+      notes: input.notes?.trim() || undefined,
+      total: couponPricing.effectiveUnitPrice * input.quantity,
       status: "pending",
       currency: product.currency,
       paymentProvider: input.paymentProvider,
+      coupon: couponPricing.couponCodeApplied,
       investorWalletAddress: input.investorWalletAddress,
     });
   }

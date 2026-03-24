@@ -141,13 +141,20 @@ describe("CheckoutService", () => {
       asset: makeAsset({ beneficiaryIban: "HU12", beneficiaryLabel: "Cityzeen" }),
       product: makeProduct(),
       quantity: 2,
+      coupon: "SPRING24",
+      notes: "Investor note",
       paymentType: "bank-transfer",
       activeUserId: "investor-1",
       authLoading: false,
       accessToken: "token",
     });
 
-    expect(orderPort.placeOrder).toHaveBeenCalled();
+    expect(orderPort.placeOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coupon: "SPRING24",
+        notes: "Investor note",
+      }),
+    );
     expect(createBankTransferPayment).toHaveBeenCalledWith({ orderId: "order-1", accessToken: "token" });
     expect(result).toEqual({ kind: "redirect", url: "https://powens.test/redirect" });
   });
@@ -190,5 +197,29 @@ describe("CheckoutService", () => {
 
     expect(result).toEqual({ kind: "success", orderId: "order-1" });
     expect(createBankTransferPayment).not.toHaveBeenCalled();
+  });
+
+  it("passes coupon and notes into order placement", async () => {
+    const orderPort = makeOrderPort();
+    const service = new CheckoutService(makeReadPort(), orderPort, makeAuthClient(), vi.fn());
+
+    await service.submitCheckout({
+      listing: makeListing(),
+      asset: makeAsset(),
+      product: makeProduct(),
+      quantity: 2,
+      coupon: "VIP50",
+      notes: "Save this on the order",
+      paymentType: "card",
+      activeUserId: "investor-1",
+      authLoading: false,
+    });
+
+    expect(orderPort.placeOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coupon: "VIP50",
+        notes: "Save this on the order",
+      }),
+    );
   });
 });

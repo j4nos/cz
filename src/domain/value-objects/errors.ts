@@ -28,6 +28,10 @@ const DOMAIN_ERROR_DEFINITIONS = {
     message: "Investor is not eligible for this product.",
     httpStatus: 403,
   },
+  INVALID_COUPON: {
+    message: "Coupon code is not valid for this product.",
+    httpStatus: 400,
+  },
   ORDER_NOT_PENDING: {
     message: "Only pending payment orders can be completed.",
     httpStatus: 409,

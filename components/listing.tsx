@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Carousel } from "@/components/ui/Carousel";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
+import { useCouponPreview } from "@/components/useCouponPreview";
+import type { CouponPreview } from "@/src/application/dto/couponPreview";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 import type { PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
 import type { Listing as ListingType, Product } from "@/src/domain/entities";
@@ -90,8 +92,15 @@ export function Listing({
 
   const hasSingleProduct = products.length === 1;
   const parsedQty = Number(quantity || 0);
-  const baseUnitPrice = selectedProduct?.unitPrice ?? 0;
-  const total = baseUnitPrice * parsedQty;
+  const couponPreview: CouponPreview | null = useCouponPreview({
+    productId: selectedProduct?.id,
+    unitPrice: selectedProduct?.unitPrice,
+    quantity: parsedQty,
+    coupon,
+  });
+  const baseUnitPrice = couponPreview?.baseUnitPrice ?? selectedProduct?.unitPrice ?? 0;
+  const effectiveUnitPrice = couponPreview?.effectiveUnitPrice ?? selectedProduct?.unitPrice ?? 0;
+  const total = couponPreview?.total ?? effectiveUnitPrice * parsedQty;
 
   function goToCheckout(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -170,8 +179,18 @@ export function Listing({
             </FormField>
             <p>
               Unit: {selectedProduct?.currency ?? listing.currency}{" "}
-              {baseUnitPrice}
+              {effectiveUnitPrice}
             </p>
+            {couponPreview?.isCouponValid ? (
+              <p className="muted">
+                Coupon applied: {couponPreview.couponCodeApplied} from{" "}
+                {selectedProduct?.currency ?? listing.currency} {baseUnitPrice} to{" "}
+                {selectedProduct?.currency ?? listing.currency} {effectiveUnitPrice}
+              </p>
+            ) : null}
+            {couponPreview?.hasCouponInput && !couponPreview.isCouponValid ? (
+              <p className="muted">{couponPreview.message ?? "Coupon code not found for this product."}</p>
+            ) : null}
             <p>
               Total: {selectedProduct?.currency ?? listing.currency}{" "}
               {total.toFixed(2)}

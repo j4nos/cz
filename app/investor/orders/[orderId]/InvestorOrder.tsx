@@ -99,13 +99,19 @@ export function InvestorOrder({
           { label: "Listing", value: listingTitle },
           {
             label: "Product",
-            value: `${productName} (${resolvedOrder.currency} ${resolvedOrder.unitPrice})`,
+            value: `${productName} (${resolvedOrder.currency} ${resolvedOrder.effectiveUnitPrice ?? resolvedOrder.unitPrice})`,
           },
+          ...(resolvedOrder.coupon
+            ? [{ label: "Coupon", value: resolvedOrder.coupon }]
+            : []),
           { label: "Quantity", value: resolvedOrder.quantity },
           {
             label: "Total",
             value: `${resolvedOrder.currency} ${resolvedOrder.total}`,
           },
+          ...(resolvedOrder.notes
+            ? [{ label: "Notes", value: resolvedOrder.notes }]
+            : []),
           {
             label: "Payment",
             value: resolvedOrder.paymentProvider ?? "card",

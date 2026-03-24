@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { generateClient } from "aws-amplify/data";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleNotch,
@@ -11,8 +12,11 @@ import {
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
+import type { Schema } from "@/amplify/data/resource";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/contexts/ToastContext";
+import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import styles from "./ChatPanel.module.css";
 
 type Message = {
@@ -28,6 +32,24 @@ type ThreadSummary = {
   lastMessageText: string;
 };
 
+function mergeMessages(current: Message[], incoming: Message[]) {
+  const byId = new Map(current.map((message) => [message.id, message]));
+  for (const message of incoming) {
+    byId.set(message.id, message);
+  }
+
+  return Array.from(byId.values()).sort((left, right) =>
+    (left.createdAt ?? "").localeCompare(right.createdAt ?? ""),
+  );
+}
+
+function upsertThread(current: ThreadSummary[], nextThread: ThreadSummary) {
+  const next = current.filter((item) => item.threadId !== nextThread.threadId);
+  return [nextThread, ...next].sort((left, right) =>
+    right.lastMessageAt.localeCompare(left.lastMessageAt),
+  );
+}
+
 type ChatPanelProps = {
   onClose?: () => void;
   mobile?: boolean;
@@ -36,6 +58,11 @@ type ChatPanelProps = {
 
 export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
   const { activeUser, ensureAnonymous } = useAuth();
+  const { setToast } = useToast();
+  const client = useMemo(() => {
+    ensureAmplifyConfigured();
+    return generateClient<Schema>();
+  }, []);
   const resolvedUserId = activeUser?.uid ?? userId ?? "";
   const [draft, setDraft] = useState("");
   const [threadId, setThreadId] = useState(() =>
@@ -61,17 +88,82 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
       return;
     }
 
+    const controller = new AbortController();
+
     async function loadThreads() {
-      const response = await fetch(`/api/chat?userId=${encodeURIComponent(resolvedUserId)}&listThreads=1`);
+      const response = await fetch(`/api/chat?userId=${encodeURIComponent(resolvedUserId)}&listThreads=1`, {
+        signal: controller.signal,
+      });
       if (!response.ok) {
+        if (!controller.signal.aborted) {
+          setToast("Could not load your chat threads.", "danger", 2500);
+        }
         return;
       }
       const data = (await response.json()) as { threads?: ThreadSummary[] };
-      setThreads(data.threads ?? []);
+      if (!controller.signal.aborted) {
+        setThreads(
+          (data.threads ?? []).sort((left, right) =>
+            right.lastMessageAt.localeCompare(left.lastMessageAt),
+          ),
+        );
+      }
     }
 
-    void loadThreads();
-  }, [resolvedUserId]);
+    void loadThreads().catch((error) => {
+      if (
+        !(error instanceof DOMException && error.name === "AbortError") &&
+        !controller.signal.aborted
+      ) {
+        setToast("Could not load your chat threads.", "danger", 2500);
+      }
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [resolvedUserId, setToast]);
+
+  useEffect(() => {
+    if (!resolvedUserId) {
+      return;
+    }
+
+    const onCreateSubscription = client.models.UserThread.onCreate({
+      authMode: "apiKey",
+      filter: { userId: { eq: resolvedUserId } },
+    }).subscribe({
+      next: ({ id, lastMessageAt, lastMessageText }) => {
+        setThreads((current) =>
+          upsertThread(current, {
+            threadId: id,
+            lastMessageAt: lastMessageAt ?? "",
+            lastMessageText: lastMessageText ?? "",
+          }),
+        );
+      },
+    });
+
+    const onUpdateSubscription = client.models.UserThread.onUpdate({
+      authMode: "apiKey",
+      filter: { userId: { eq: resolvedUserId } },
+    }).subscribe({
+      next: ({ id, lastMessageAt, lastMessageText }) => {
+        setThreads((current) =>
+          upsertThread(current, {
+            threadId: id,
+            lastMessageAt: lastMessageAt ?? "",
+            lastMessageText: lastMessageText ?? "",
+          }),
+        );
+      },
+    });
+
+    return () => {
+      onCreateSubscription.unsubscribe();
+      onUpdateSubscription.unsubscribe();
+    };
+  }, [client, resolvedUserId]);
 
   useEffect(() => {
     if (!resolvedUserId) {
@@ -79,21 +171,72 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
       return;
     }
 
+    const controller = new AbortController();
+
     async function loadHistory() {
       const response = await fetch(
         `/api/chat?userId=${encodeURIComponent(resolvedUserId)}&threadId=${encodeURIComponent(threadId)}`,
+        { signal: controller.signal },
       );
       if (!response.ok) {
-        setMessages([]);
+        if (!controller.signal.aborted) {
+          setToast("Could not load this thread.", "danger", 2500);
+          setMessages([]);
+        }
         return;
       }
 
       const data = (await response.json()) as { messages?: Message[] };
-      setMessages(data.messages ?? []);
+      if (!controller.signal.aborted) {
+        setMessages(data.messages ?? []);
+      }
     }
 
-    void loadHistory();
-  }, [resolvedUserId, threadId]);
+    void loadHistory().catch((error) => {
+      if (
+        !(error instanceof DOMException && error.name === "AbortError") &&
+        !controller.signal.aborted
+      ) {
+        setToast("Could not load this thread.", "danger", 2500);
+        setMessages([]);
+      }
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [resolvedUserId, setToast, threadId]);
+
+  useEffect(() => {
+    if (!resolvedUserId || !threadId) {
+      return;
+    }
+
+    const subscription = client.models.UserMessage.onCreate({
+      authMode: "apiKey",
+      filter: {
+        userId: { eq: resolvedUserId },
+        threadId: { eq: threadId },
+      },
+    }).subscribe({
+      next: (message) => {
+        setMessages((current) =>
+          mergeMessages(current, [
+            {
+              id: message.id,
+              role: (message.role as Message["role"]) ?? "user",
+              text: message.text ?? "",
+              createdAt: message.createdAt ?? undefined,
+            },
+          ]),
+        );
+      },
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [client, resolvedUserId, threadId]);
 
   async function send() {
     const text = draft.trim();
@@ -138,25 +281,34 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
         answer?: string;
         error?: string;
         thread?: ThreadSummary;
+        messageIds?: string[];
       };
       if (!response.ok) {
         throw new Error(data.error || "Chat request failed.");
       }
 
       const now = new Date().toISOString();
-      setMessages((current) => [
-        ...current,
-        { id: `${threadId}-u-${now}`, role: "user", text, createdAt: now },
-        { id: `${threadId}-a-${now}`, role: "assistant", text: data.answer ?? "", createdAt: now },
-      ]);
+      setMessages((current) =>
+        mergeMessages(current, [
+          {
+            id: data.messageIds?.[0] ?? `${threadId}-u-${now}`,
+            role: "user",
+            text,
+            createdAt: now,
+          },
+          {
+            id: data.messageIds?.[1] ?? `${threadId}-a-${now}`,
+            role: "assistant",
+            text: data.answer ?? "",
+            createdAt: now,
+          },
+        ]),
+      );
       setDraft("");
 
       if (data.thread) {
         const nextThread = data.thread;
-        setThreads((current) => {
-          const next = current.filter((item) => item.threadId !== nextThread.threadId);
-          return [nextThread, ...next];
-        });
+        setThreads((current) => upsertThread(current, nextThread));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Chat request failed.";
