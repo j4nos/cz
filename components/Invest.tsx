@@ -25,7 +25,7 @@ import {
 import type { CouponPreview } from "@/src/application/dto/couponPreview";
 import { CheckoutService } from "@/src/application/use-cases/checkoutService";
 import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
-import { createOrderController } from "@/src/infrastructure/controllers/createOrderController";
+import { createInvestmentPlatformService } from "@/src/infrastructure/composition/defaults";
 import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 import type { Asset, Listing, Product } from "@/src/domain/entities";
 
@@ -58,7 +58,7 @@ export function Invest({
     () =>
       new CheckoutService(
         readController,
-        createOrderController(),
+        createInvestmentPlatformService(),
         authClient,
         async ({ orderId, accessToken: currentAccessToken }) => {
           const response = await fetch("/api/powens/create-payment", {

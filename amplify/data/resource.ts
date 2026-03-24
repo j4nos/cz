@@ -87,6 +87,7 @@ const schema = a.schema({
       orders: a.hasMany("Order", "listingId"),
     })
     .authorization((allow) => [
+      allow.publicApiKey().to(["read"]),
       allow.ownerDefinedIn("investorId"),
       allow.ownerDefinedIn("providerUserId"),
     ]),

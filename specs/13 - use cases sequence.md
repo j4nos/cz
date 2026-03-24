@@ -14,6 +14,55 @@ sequenceDiagram
   InvestmentPlatformService-->>UI: Asset
 ```
 
+## AssetSubmissionFlow.submitAsset
+
+```mermaid
+sequenceDiagram
+  participant Step4Page as "Step4PageContent.tsx"
+  participant AssetRepository
+  participant SubmitAssetAPI as "POST /api/assets/submit"
+  participant VerifyToken as "verifyAccessToken"
+  participant AppSyncGraphQL as "Amplify Data GraphQL"
+  participant TokenizationGateway
+
+  Note over Step4Page,AssetRepository: Trigger: page load
+  Step4Page->>AssetRepository: getAssetById(assetId)
+  AssetRepository-->>Step4Page: Asset
+  Step4Page->>Step4Page: update wizard state from loaded asset
+
+  Note over Step4Page,SubmitAssetAPI: Trigger: user clicks "Submit asset"
+  Step4Page->>Step4Page: validate review fields
+  alt validation error
+    Step4Page-->>Step4Page: show warning toast
+  else ready to submit
+    Step4Page->>SubmitAssetAPI: POST with bearer token + asset payload
+    SubmitAssetAPI->>VerifyToken: verifyAccessToken(token)
+    VerifyToken-->>SubmitAssetAPI: user payload
+    SubmitAssetAPI->>AppSyncGraphQL: getAsset(id) with Authorization: bearer token
+    AppSyncGraphQL-->>SubmitAssetAPI: Asset
+    alt asset owned by another user
+      SubmitAssetAPI-->>Step4Page: 403 Forbidden
+      Step4Page-->>Step4Page: show error toast
+    else asset already tokenized
+      SubmitAssetAPI->>AppSyncGraphQL: updateAsset(status=submitted)
+      AppSyncGraphQL-->>SubmitAssetAPI: Asset
+      SubmitAssetAPI-->>Step4Page: { asset }
+      Step4Page->>Step4Page: reset wizard state
+      Step4Page-->>Step4Page: show success toast
+      Step4Page->>Step4Page: navigate to /asset-provider/assets/[assetId]
+    else deploy required
+      SubmitAssetAPI->>TokenizationGateway: tokenize(payload)
+      TokenizationGateway-->>SubmitAssetAPI: deployed contract
+      SubmitAssetAPI->>AppSyncGraphQL: updateAsset(tokenAddress, status=submitted)
+      AppSyncGraphQL-->>SubmitAssetAPI: Asset
+      SubmitAssetAPI-->>Step4Page: { asset }
+      Step4Page->>Step4Page: reset wizard state
+      Step4Page-->>Step4Page: show success toast
+      Step4Page->>Step4Page: navigate to /asset-provider/assets/[assetId]
+    end
+  end
+```
+
 ## InvestmentPlatformService.createListing
 
 ```mermaid
@@ -76,23 +125,6 @@ sequenceDiagram
   InvestmentPlatformService-->>UI: Product
 ```
 
-## InvestmentPlatformService.startOrder
-
-```mermaid
-sequenceDiagram
-  participant UI
-  participant InvestmentPlatformService
-  participant InvestmentRepository
-
-  UI->>InvestmentPlatformService: startOrder(input)
-  InvestmentPlatformService->>InvestmentRepository: getListingById(listingId)
-  InvestmentPlatformService->>InvestmentRepository: getProductById(productId)
-  InvestmentRepository-->>InvestmentPlatformService: Listing, Product
-  InvestmentPlatformService->>InvestmentRepository: createOrder(order)
-  InvestmentRepository-->>InvestmentPlatformService: Order
-  InvestmentPlatformService-->>UI: Order
-```
-
 ## InvestmentPlatformService.completeOrderPayment
 
 ```mermaid
@@ -136,141 +168,89 @@ sequenceDiagram
   CheckoutService-->>InvestPage: listing, asset, products, providerName, selectedProductId, quantity, paymentType, paymentOptions
 ```
 
-## CheckoutService.submitCheckout
+## Checkout End-to-End
 
 ```mermaid
 sequenceDiagram
   participant InvestPage as "Invest.tsx"
   participant CheckoutService
   participant checkoutRules
-  participant OrderPort
-  participant PowensAPI
+  participant InvestmentPlatformService
+  participant InvestmentRepository
+  participant PowensAPI as "POST /api/powens/create-payment"
 
   Note over InvestPage,CheckoutService: Trigger: user clicks "Place Order"
   InvestPage->>CheckoutService: submitCheckout(input)
   CheckoutService->>checkoutRules: getCheckoutSubmissionError(input)
   alt validation error
-    CheckoutService-->>InvestPage: { kind: error }
-  else card
-    CheckoutService->>OrderPort: placeOrder(input)
-    OrderPort-->>CheckoutService: Order
-    CheckoutService-->>InvestPage: { kind: success, orderId }
-  else bank-transfer
-    CheckoutService->>OrderPort: placeOrder(input)
-    OrderPort-->>CheckoutService: Order
-    CheckoutService->>PowensAPI: createBankTransferPayment(orderId, accessToken)
-    PowensAPI-->>CheckoutService: redirectUrl
-    CheckoutService-->>InvestPage: { kind: redirect, url }
-  end
-```
-
-## ContractDeploymentService.loadAssetReview
-
-```mermaid
-sequenceDiagram
-  participant UI
-  participant ContractDeploymentService
-  participant AssetRepository
-
-  UI->>ContractDeploymentService: loadAssetReview(assetId, wizardTokenStandard)
-  ContractDeploymentService->>AssetRepository: getAssetById(assetId)
-  AssetRepository-->>ContractDeploymentService: Asset
-  ContractDeploymentService-->>UI: asset, wizardPatch
-```
-
-## ContractDeploymentService.submit
-
-```mermaid
-sequenceDiagram
-  participant UI
-  participant ContractDeploymentService
-  participant contractDeploymentRules
-  participant TokenizationGateway
-  participant SubmitAssetAPI as "POST /api/assets/submit"
-  participant AppSyncGraphQL as "Amplify Data GraphQL"
-
-  UI->>ContractDeploymentService: submit(input)
-  ContractDeploymentService->>contractDeploymentRules: getContractDeploymentError(input)
-  alt validation error
-    ContractDeploymentService-->>UI: { kind: error }
-  else ready to submit
-    ContractDeploymentService->>SubmitAssetAPI: submitAsset(payload, bearerToken)
-    SubmitAssetAPI->>SubmitAssetAPI: verifyAccessToken(token)
-    SubmitAssetAPI->>AppSyncGraphQL: getAsset(id) with Authorization: bearer token
-    AppSyncGraphQL-->>SubmitAssetAPI: Asset
-    alt deploy needed
-      SubmitAssetAPI->>TokenizationGateway: tokenize(payload)
-      TokenizationGateway-->>SubmitAssetAPI: deployed contract
+    checkoutRules-->>CheckoutService: error
+    CheckoutService-->>InvestPage: { kind: error, message }
+  else valid
+    CheckoutService->>InvestmentPlatformService: startOrder(input)
+    InvestmentPlatformService->>InvestmentRepository: getUserProfileById(investorId)
+    InvestmentRepository-->>InvestmentPlatformService: UserProfile
+    InvestmentPlatformService->>InvestmentRepository: getListingById(listingId)
+    InvestmentRepository-->>InvestmentPlatformService: Listing
+    InvestmentPlatformService->>InvestmentRepository: getProductById(productId)
+    InvestmentRepository-->>InvestmentPlatformService: Product
+    InvestmentPlatformService->>InvestmentRepository: getAssetById(listing.assetId)
+    InvestmentRepository-->>InvestmentPlatformService: Asset
+    InvestmentPlatformService->>InvestmentRepository: createOrder(pending order)
+    InvestmentRepository-->>InvestmentPlatformService: Order
+    InvestmentPlatformService-->>CheckoutService: Order
+    alt paymentType == bank-transfer
+      CheckoutService->>PowensAPI: create payment(order.id, accessToken)
+      PowensAPI-->>CheckoutService: { redirectUrl }
+      CheckoutService-->>InvestPage: { kind: redirect, url }
+    else paymentType == card
+      CheckoutService-->>InvestPage: { kind: success, orderId }
     end
-    SubmitAssetAPI->>AppSyncGraphQL: updateAsset(submitted asset) with Authorization: bearer token
-    AppSyncGraphQL-->>SubmitAssetAPI: Asset
-    ContractDeploymentService-->>UI: { kind: success, asset }
   end
 ```
 
-## POST /api/assets/submit
-
-```mermaid
-sequenceDiagram
-  participant Step4Page as "Step 4 UI"
-  participant SubmitAssetAPI as "POST /api/assets/submit"
-  participant VerifyToken as "verifyAccessToken"
-  participant AppSyncGraphQL as "Amplify Data GraphQL"
-  participant TokenizationGateway
-
-  Step4Page->>SubmitAssetAPI: POST with bearer token + asset payload
-  SubmitAssetAPI->>VerifyToken: verifyAccessToken(token)
-  VerifyToken-->>SubmitAssetAPI: user payload
-  SubmitAssetAPI->>AppSyncGraphQL: getAsset(id) with Authorization: bearer token
-  AppSyncGraphQL-->>SubmitAssetAPI: Asset
-  alt asset owned by another user
-    SubmitAssetAPI-->>Step4Page: 403 Forbidden
-  else asset already tokenized
-    SubmitAssetAPI->>AppSyncGraphQL: updateAsset(status=submitted)
-    AppSyncGraphQL-->>SubmitAssetAPI: Asset
-    SubmitAssetAPI-->>Step4Page: { asset }
-  else deploy required
-    SubmitAssetAPI->>TokenizationGateway: tokenize(payload)
-    TokenizationGateway-->>SubmitAssetAPI: deployed contract
-    SubmitAssetAPI->>AppSyncGraphQL: updateAsset(tokenAddress, status=submitted)
-    AppSyncGraphQL-->>SubmitAssetAPI: Asset
-    SubmitAssetAPI-->>Step4Page: { asset }
-  end
-```
-
-## POST /api/tokenize-asset
+## POST /api/powens/create-payment
 
 ```mermaid
 sequenceDiagram
   participant Client
-  participant TokenizeAssetAPI as "POST /api/tokenize-asset"
+  participant CreatePaymentAPI as "POST /api/powens/create-payment"
   participant VerifyToken as "verifyAccessToken"
   participant AppSyncGraphQL as "Amplify Data GraphQL"
-  participant TokenizationGateway
+  participant PowensAuth as "Powens auth/token"
+  participant PowensPayments as "Powens /payments"
+  participant PowensScopedToken as "Powens /payments/{id}/scopedtoken"
 
-  Client->>TokenizeAssetAPI: POST with bearer token
-  TokenizeAssetAPI->>VerifyToken: verifyAccessToken(token)
-  VerifyToken-->>TokenizeAssetAPI: user payload
-  TokenizeAssetAPI->>AppSyncGraphQL: getAsset(id) with Authorization: bearer token
-  AppSyncGraphQL-->>TokenizeAssetAPI: Asset
-  TokenizeAssetAPI->>TokenizationGateway: tokenize(payload)
-  TokenizationGateway-->>TokenizeAssetAPI: deployed contract
-  TokenizeAssetAPI-->>Client: TokenizationResult
-```
+  Client->>CreatePaymentAPI: POST { orderId } + bearer access token
+  CreatePaymentAPI->>VerifyToken: verifyAccessToken(token)
+  VerifyToken-->>CreatePaymentAPI: user payload
 
-## OwnershipMintingService.resolveContext
-
-```mermaid
-sequenceDiagram
-  participant UI
-  participant OwnershipMintingService
-  participant ReadPort
-
-  UI->>OwnershipMintingService: resolveContext(order, knownTokenAddress)
-  OwnershipMintingService->>ReadPort: getListingById(order.listingId)
-  OwnershipMintingService->>ReadPort: getAssetById(listing.assetId)
-  ReadPort-->>OwnershipMintingService: Listing, Asset
-  OwnershipMintingService-->>UI: listing, asset, tokenAddress
+  CreatePaymentAPI->>AppSyncGraphQL: getOrder(orderId) with Authorization: bearer token
+  AppSyncGraphQL-->>CreatePaymentAPI: Order
+  alt order missing / wrong user / wrong provider
+    CreatePaymentAPI-->>Client: 4xx error
+  else bank-transfer order owned by caller
+    CreatePaymentAPI->>AppSyncGraphQL: getListing(order.listingId)
+    AppSyncGraphQL-->>CreatePaymentAPI: Listing
+    CreatePaymentAPI->>AppSyncGraphQL: getAsset(listing.assetId)
+    AppSyncGraphQL-->>CreatePaymentAPI: Asset
+    alt missing asset or beneficiary details
+      CreatePaymentAPI-->>Client: 4xx error
+    else ready to create payment
+      CreatePaymentAPI->>PowensAuth: fetch admin token(scope=payments:admin)
+      PowensAuth-->>CreatePaymentAPI: admin access token
+      CreatePaymentAPI->>PowensPayments: create payment(client_redirect_uri, client_state, instructions)
+      PowensPayments-->>CreatePaymentAPI: paymentId + payment state
+      alt Powens payment creation failed
+        CreatePaymentAPI-->>Client: 502 error
+      else payment created
+        CreatePaymentAPI->>AppSyncGraphQL: updateOrder(paymentProviderId, paymentProviderStatus)
+        AppSyncGraphQL-->>CreatePaymentAPI: Order updated
+        CreatePaymentAPI->>PowensScopedToken: fetch payment scoped token(scope=payments:validate)
+        PowensScopedToken-->>CreatePaymentAPI: payment scoped token
+        CreatePaymentAPI-->>Client: { redirectUrl, paymentId }
+      end
+    end
+  end
 ```
 
 ## OwnershipMintingService.mint
@@ -284,8 +264,11 @@ sequenceDiagram
   participant MintOwnershipAPI
 
   UI->>OwnershipMintingService: mint(input)
+  OwnershipMintingService->>OwnershipMintingService: resolveContext(order, knownTokenAddress)
   OwnershipMintingService->>ReadPort: getListingById(order.listingId)
   OwnershipMintingService->>ReadPort: getAssetById(listing.assetId)
+  ReadPort-->>OwnershipMintingService: Listing, Asset
+  OwnershipMintingService->>OwnershipMintingService: derive tokenAddress
   OwnershipMintingService->>ownershipMinting: getMintOwnershipError(input)
   alt validation error
     OwnershipMintingService-->>UI: { kind: error }
@@ -306,6 +289,7 @@ sequenceDiagram
   participant MintOwnershipAPI as "POST /api/mint-ownership"
   participant VerifyToken as "verifyAccessToken"
   participant AppSyncGraphQL as "Amplify Data GraphQL"
+  participant MintGateway as "EthersOwnershipMintingGateway"
 
   UI->>MintOwnershipAPI: POST with bearer token + { orderId, walletAddress }
   MintOwnershipAPI->>VerifyToken: verifyAccessToken(token)
@@ -316,22 +300,32 @@ sequenceDiagram
     MintOwnershipAPI-->>UI: 403 Forbidden
   else order.mintedAt exists
     MintOwnershipAPI-->>UI: { status: "minted" }
-  else order.mintRequestedAt exists
+  else order.mintRequestedAt or order.mintingAt exists
     MintOwnershipAPI-->>UI: { status: "pending" }
-  else wallet missing on order
-    MintOwnershipAPI->>AppSyncGraphQL: updateOrder(investorWalletAddress) with Authorization: bearer token
-    AppSyncGraphQL-->>MintOwnershipAPI: Order
-    MintOwnershipAPI->>AppSyncGraphQL: updateOrder(mintRequestedAt) with Authorization: bearer token
-    AppSyncGraphQL-->>MintOwnershipAPI: Order
-    MintOwnershipAPI-->>UI: { status: "queued", mintRequestedAt }
-  else no mint started
-    MintOwnershipAPI->>AppSyncGraphQL: updateOrder(mintRequestedAt) with Authorization: bearer token
-    AppSyncGraphQL-->>MintOwnershipAPI: Order
-    MintOwnershipAPI-->>UI: { status: "queued", mintRequestedAt }
+  else ready to mint
+    MintOwnershipAPI->>MintOwnershipAPI: resolve and validate investor wallet
+    MintOwnershipAPI->>AppSyncGraphQL: getListing(order.listingId)
+    AppSyncGraphQL-->>MintOwnershipAPI: Listing
+    MintOwnershipAPI->>AppSyncGraphQL: getAsset(listing.assetId)
+    AppSyncGraphQL-->>MintOwnershipAPI: Asset
+    MintOwnershipAPI->>AppSyncGraphQL: updateOrder(investorWalletAddress, mintRequestedAt, mintingAt) with condition(mintedAt/mintRequestedAt/mintingAt absent)
+    alt conditional update failed
+      AppSyncGraphQL-->>MintOwnershipAPI: conditional check failed
+      MintOwnershipAPI->>AppSyncGraphQL: getOrder(id)
+      AppSyncGraphQL-->>MintOwnershipAPI: fresh Order
+      MintOwnershipAPI-->>UI: { status: "pending" | "minted" }
+    else mint start locked
+      AppSyncGraphQL-->>MintOwnershipAPI: Order updated
+      MintOwnershipAPI->>MintGateway: mint(tokenAddress, wallet, quantity)
+      MintGateway-->>MintOwnershipAPI: txHash
+      MintOwnershipAPI->>AppSyncGraphQL: updateOrder(mintTxHash, mintedAt)
+      AppSyncGraphQL-->>MintOwnershipAPI: Order updated
+      MintOwnershipAPI-->>UI: { status: "minted", mintRequestedAt, mintedAt, txHash }
+    end
   end
 ```
 
-## POST /api/powens/payment-status
+## PowensPaymentSync.pullFromCallbackUi
 
 ```mermaid
 sequenceDiagram
@@ -351,6 +345,47 @@ sequenceDiagram
   PaymentStatusAPI->>AppSyncGraphQL: updateOrder(status, paymentProviderStatus) with Authorization: bearer token
   AppSyncGraphQL-->>PaymentStatusAPI: Order
   PaymentStatusAPI-->>CallbackPage: { paymentState, orderStatus }
+```
+
+## PowensPaymentSync.pushFromPowensWebhook
+
+```mermaid
+sequenceDiagram
+  participant Powens
+  participant WebhookAPI as "POST /api/powens/webhook"
+  participant PowensPaymentSyncService
+  participant InvestmentRepository
+  participant InvestmentPlatformService
+
+  Powens->>WebhookAPI: payment webhook { id, state } + signature headers
+  WebhookAPI->>WebhookAPI: verify webhook signature
+  alt invalid signature or invalid payload
+    WebhookAPI-->>Powens: 4xx / 202
+  else valid payment webhook
+    WebhookAPI->>PowensPaymentSyncService: syncByPaymentProviderId(paymentProviderId, paymentState)
+    PowensPaymentSyncService->>InvestmentRepository: findOrderByPaymentProviderId(paymentProviderId)
+    InvestmentRepository-->>PowensPaymentSyncService: Order
+    alt no matching order
+      PowensPaymentSyncService-->>WebhookAPI: null
+      WebhookAPI-->>Powens: 202 accepted
+    else payment state resolves to paid and order pending
+      PowensPaymentSyncService->>InvestmentPlatformService: completeOrderPayment(orderId)
+      InvestmentPlatformService->>InvestmentRepository: getOrderById(orderId)
+      InvestmentPlatformService->>InvestmentRepository: getProductById(productId)
+      InvestmentPlatformService->>InvestmentRepository: updateProduct(remainingSupply)
+      InvestmentPlatformService->>InvestmentRepository: updateOrder(status=paid)
+      InvestmentRepository-->>PowensPaymentSyncService: Order
+      PowensPaymentSyncService->>InvestmentRepository: updateOrder(paymentProviderStatus)
+      InvestmentRepository-->>PowensPaymentSyncService: Order
+      PowensPaymentSyncService-->>WebhookAPI: Order
+      WebhookAPI-->>Powens: 200 received
+    else any other mapped payment state
+      PowensPaymentSyncService->>InvestmentRepository: updateOrder(status, paymentProviderStatus)
+      InvestmentRepository-->>PowensPaymentSyncService: Order
+      PowensPaymentSyncService-->>WebhookAPI: Order
+      WebhookAPI-->>Powens: 200 received
+    end
+  end
 ```
 
 ## AccountSettingsService.saveProviderSettings
@@ -456,50 +491,6 @@ sequenceDiagram
   BlogPostAdminService-->>UI: void
 ```
 
-## PowensPaymentSyncService.syncByPaymentProviderId
-
-```mermaid
-sequenceDiagram
-  participant PowensWebhookRoute
-  participant PowensPaymentSyncService
-  participant InvestmentRepository
-  participant InvestmentPlatformService
-
-  PowensWebhookRoute->>PowensPaymentSyncService: syncByPaymentProviderId(paymentProviderId, paymentState)
-  PowensPaymentSyncService->>InvestmentRepository: findOrderByPaymentProviderId(paymentProviderId)
-  InvestmentRepository-->>PowensPaymentSyncService: Order
-  alt paymentState maps to paid and Order.status is pending
-    PowensPaymentSyncService->>InvestmentPlatformService: completeOrderPayment({ orderId })
-    InvestmentPlatformService-->>PowensPaymentSyncService: paid Order
-    PowensPaymentSyncService->>InvestmentRepository: updateOrder(order with paymentProviderStatus)
-  else other payment state
-    PowensPaymentSyncService->>InvestmentRepository: updateOrder(order with status and paymentProviderStatus)
-  end
-  PowensPaymentSyncService-->>PowensWebhookRoute: Order | null
-```
-
-## PowensPaymentSyncService.syncByOrderId
-
-```mermaid
-sequenceDiagram
-  participant PowensPaymentStatusRoute
-  participant PowensPaymentSyncService
-  participant InvestmentRepository
-  participant InvestmentPlatformService
-
-  PowensPaymentStatusRoute->>PowensPaymentSyncService: syncByOrderId(orderId, paymentState)
-  PowensPaymentSyncService->>InvestmentRepository: getOrderById(orderId)
-  InvestmentRepository-->>PowensPaymentSyncService: Order
-  alt paymentState maps to paid and Order.status is pending
-    PowensPaymentSyncService->>InvestmentPlatformService: completeOrderPayment({ orderId })
-    InvestmentPlatformService-->>PowensPaymentSyncService: paid Order
-    PowensPaymentSyncService->>InvestmentRepository: updateOrder(order with paymentProviderStatus)
-  else other payment state
-    PowensPaymentSyncService->>InvestmentRepository: updateOrder(order with status and paymentProviderStatus)
-  end
-  PowensPaymentSyncService-->>PowensPaymentStatusRoute: Order | null
-```
-
 ## publicContent.listPublicListings
 
 ```mermaid
@@ -602,19 +593,6 @@ sequenceDiagram
   checkoutRules-->>UI: error | undefined
 ```
 
-## contractDeploymentRules
-
-```mermaid
-sequenceDiagram
-  participant ContractDeploymentService
-  participant contractDeploymentRules
-
-  ContractDeploymentService->>contractDeploymentRules: getContractDeploymentError(input)
-  ContractDeploymentService->>contractDeploymentRules: getDesiredContractStandard(input)
-  ContractDeploymentService->>contractDeploymentRules: shouldDeployContract(asset)
-  ContractDeploymentService->>contractDeploymentRules: buildAssetAfterContractDeployment(input)
-  contractDeploymentRules-->>ContractDeploymentService: validation / payload / next Asset
-```
 
 ## ownershipMinting
 

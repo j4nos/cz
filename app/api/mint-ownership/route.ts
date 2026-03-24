@@ -14,6 +14,8 @@ type GraphQlResponse<T> = {
   errors?: Array<{ message?: string }>;
 };
 
+type GraphQlCondition = Record<string, unknown>;
+
 type OrderRecord = {
   id: string;
   investorId: string;
@@ -156,19 +158,24 @@ async function getAssetById(assetId: string, token: string): Promise<AssetRecord
   return data.getAsset;
 }
 
+const isConditionalCheckFailure = (error: unknown) =>
+  error instanceof Error &&
+  /conditional request failed|condition/i.test(error.message);
+
 async function updateOrder(
   input: Record<string, unknown>,
   token: string,
+  condition?: GraphQlCondition,
 ): Promise<void> {
   await callGraphQl<{ updateOrder: { id: string } | null }>(
     `
-      mutation UpdateOrder($input: UpdateOrderInput!) {
-        updateOrder(input: $input) {
+      mutation UpdateOrder($input: UpdateOrderInput!, $condition: ModelOrderConditionInput) {
+        updateOrder(input: $input, condition: $condition) {
           id
         }
       }
     `,
-    { input },
+    { input, condition },
     token,
   );
 }
@@ -229,36 +236,48 @@ export async function POST(request: Request) {
           ? to.trim()
           : "";
 
-    if (!order.investorWalletAddress) {
-      if (!resolvedWallet) {
-        return NextResponse.json(
-          { error: "Missing investor wallet address." },
-          { status: 400 },
-        );
-      }
-      if (!ethers.isAddress(resolvedWallet)) {
-        return NextResponse.json(
-          { error: "Invalid investor wallet address." },
-          { status: 400 },
-        );
-      }
-
-      await updateOrder(
-        {
-          id: order.id,
-          investorWalletAddress: resolvedWallet,
-        },
-        token,
-      );
-      order.investorWalletAddress = resolvedWallet;
-    }
-
     if (order.mintedAt) {
       return NextResponse.json({
         status: "minted",
         mintedAt: order.mintedAt,
         txHash: order.mintTxHash ?? undefined,
       });
+    }
+
+    if (order.mintRequestedAt || order.mintingAt) {
+      return NextResponse.json({
+        status: "pending",
+        mintRequestedAt: order.mintRequestedAt ?? undefined,
+        mintedAt: order.mintedAt ?? undefined,
+        txHash: order.mintTxHash ?? undefined,
+      });
+    }
+
+    if (!order.investorWalletAddress && !resolvedWallet) {
+      return NextResponse.json(
+        { error: "Missing investor wallet address." },
+        { status: 400 },
+      );
+    }
+
+    const effectiveWallet =
+      order.investorWalletAddress?.trim() || resolvedWallet;
+    if (!effectiveWallet || !ethers.isAddress(effectiveWallet)) {
+      return NextResponse.json(
+        { error: "Invalid investor wallet address." },
+        { status: 400 },
+      );
+    }
+
+    if (
+      order.investorWalletAddress?.trim() &&
+      resolvedWallet &&
+      order.investorWalletAddress.trim() !== resolvedWallet
+    ) {
+      return NextResponse.json(
+        { error: "Order already has a different investor wallet address." },
+        { status: 409 },
+      );
     }
 
     const listing = await getListingById(order.listingId, token);
@@ -276,21 +295,56 @@ export async function POST(request: Request) {
 
     const mintRequestedAt = order.mintRequestedAt || new Date().toISOString();
     const mintingAt = new Date().toISOString();
-    await updateOrder(
-      {
-        id: order.id,
-        investorWalletAddress: order.investorWalletAddress,
-        mintRequestedAt,
-        mintingAt,
-        mintError: null,
-      },
-      token,
-    );
+    try {
+      await updateOrder(
+        {
+          id: order.id,
+          investorWalletAddress: effectiveWallet,
+          mintRequestedAt,
+          mintingAt,
+          mintError: null,
+        },
+        token,
+        {
+          mintedAt: { attributeExists: false },
+          mintRequestedAt: { attributeExists: false },
+          mintingAt: { attributeExists: false },
+        },
+      );
+    } catch (error) {
+      if (!isConditionalCheckFailure(error)) {
+        throw error;
+      }
+
+      const freshOrder = await getOrderById(order.id, token);
+      if (freshOrder?.mintedAt) {
+        return NextResponse.json({
+          status: "minted",
+          mintRequestedAt: freshOrder.mintRequestedAt ?? undefined,
+          mintedAt: freshOrder.mintedAt,
+          txHash: freshOrder.mintTxHash ?? undefined,
+        });
+      }
+
+      if (freshOrder?.mintRequestedAt || freshOrder?.mintingAt) {
+        return NextResponse.json({
+          status: "pending",
+          mintRequestedAt: freshOrder.mintRequestedAt ?? undefined,
+          mintedAt: freshOrder.mintedAt ?? undefined,
+          txHash: freshOrder.mintTxHash ?? undefined,
+        });
+      }
+
+      return NextResponse.json(
+        { error: "Mint already started for this order." },
+        { status: 409 },
+      );
+    }
 
     const gateway = new EthersOwnershipMintingGateway();
     const minted = await gateway.mint({
       tokenAddress: asset.tokenAddress,
-      to: order.investorWalletAddress,
+      to: effectiveWallet,
       amount: order.quantity,
       tokenStandard: asset.tokenStandard ?? undefined,
     });
@@ -299,7 +353,7 @@ export async function POST(request: Request) {
     await updateOrder(
       {
         id: order.id,
-        investorWalletAddress: order.investorWalletAddress,
+        investorWalletAddress: effectiveWallet,
         mintRequestedAt,
         mintingAt,
         mintTxHash: minted.txHash,

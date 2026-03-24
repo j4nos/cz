@@ -9,8 +9,8 @@ import {
 } from "@/src/application/use-cases/checkoutRules";
 import type { AuthClient } from "@/src/application/interfaces/authClient";
 import type { Asset, Listing, Product } from "@/src/domain/entities";
-import type { OrderPort } from "@/src/application/interfaces/orderPort";
 import type { ReadPort } from "@/src/application/interfaces/readPort";
+import type { InvestmentPlatformService } from "@/src/application/use-cases/investmentPlatformService";
 
 type LoadCheckoutInput = {
   listingId: string;
@@ -39,7 +39,7 @@ type CreatePaymentResult = {
 export class CheckoutService {
   constructor(
     private readonly readController: ReadPort,
-    private readonly orderController: OrderPort,
+    private readonly orderService: Pick<InvestmentPlatformService, "startOrder">,
     private readonly authClient: AuthClient,
     private readonly createBankTransferPayment: (input: {
       orderId: string;
@@ -108,7 +108,7 @@ export class CheckoutService {
       return { kind: "error", message: "Unable to place order.", tone: "danger" };
     }
 
-    const order = await this.orderController.placeOrder({
+    const order = await this.orderService.startOrder({
       investorId: input.activeUserId,
       listingId: input.listing.id,
       productId: input.product.id,
