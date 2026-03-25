@@ -1,22 +1,14 @@
 "use client";
 
-import { generateClient } from "aws-amplify/data";
-import { uploadData } from "aws-amplify/storage";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import type { Schema } from "@/amplify/data/resource";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
 import { useToast } from "@/contexts/ToastContext";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
-import {
-  assetImagePrefix,
-  normalizeStoredPublicPath,
-  toSafeFileName,
-} from "@/src/infrastructure/storage/publicUrls";
+import { appendAssetImages } from "@/src/presentation/composition/client";
 
 export function Step2PageContent({ assetId }: { assetId: string }) {
   const router = useRouter();
@@ -42,35 +34,7 @@ export function Step2PageContent({ assetId }: { assetId: string }) {
 
     setUploading(true);
     try {
-      const uploadedPaths = await Promise.all(
-        files.map(async (file, index) => {
-          const fileName = `${Date.now()}-${index}-${toSafeFileName(file.name)}`;
-          const path = `${assetImagePrefix(assetId)}${fileName}`;
-          await uploadData({
-            path,
-            data: file,
-            options: {
-              contentType: file.type || undefined,
-            },
-          }).result;
-          return path;
-        }),
-      );
-
-      ensureAmplifyConfigured();
-      const client = generateClient<Schema>();
-      const existingAsset = await client.models.Asset.get({ id: assetId });
-      const existingImages = Array.isArray(existingAsset.data?.imageUrls)
-        ? existingAsset.data.imageUrls.filter((value): value is string => typeof value === "string")
-        : [];
-      const nextImages = Array.from(
-        new Set([...existingImages.map(normalizeStoredPublicPath), ...uploadedPaths]),
-      );
-      await client.models.Asset.update({
-        id: assetId,
-        imageUrls: nextImages,
-      });
-
+      const uploadedPaths = await appendAssetImages({ assetId, files });
       setFiles([]);
       setToast(`Uploaded ${uploadedPaths.length} file(s)`, "success", 2000);
     } finally {

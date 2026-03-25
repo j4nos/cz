@@ -1,12 +1,11 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sendMessage, listThreads, listMessages, verifyAccessToken, parseAnonCookieValue } = vi.hoisted(() => ({
+const { sendMessage, listThreads, listMessages, verifyAccessToken } = vi.hoisted(() => ({
   sendMessage: vi.fn(),
   listThreads: vi.fn(),
   listMessages: vi.fn(),
   verifyAccessToken: vi.fn(),
-  parseAnonCookieValue: vi.fn(),
 }));
 
 vi.mock("@/src/application/use-cases/chatService", () => ({
@@ -19,10 +18,6 @@ vi.mock("@/src/application/use-cases/chatService", () => ({
 vi.mock("@/src/infrastructure/repositories/amplifyChatRepository", () => ({ AmplifyChatRepository: class {} }));
 vi.mock("@/src/infrastructure/gateways/ruleBasedChatGateway", () => ({ RuleBasedChatGateway: class {} }));
 vi.mock("@/src/infrastructure/auth/verifyAccessToken", () => ({ verifyAccessToken }));
-vi.mock("@/src/infrastructure/auth/anonSession", () => ({
-  getAnonCookieName: () => "cityzeen-anon",
-  parseAnonCookieValue,
-}));
 
 import { GET, POST } from "@/app/api/chat/route";
 
@@ -36,7 +31,6 @@ describe("/api/chat route", () => {
     listThreads.mockReset().mockResolvedValue([{ threadId: "thread-1", userId: "user-1" }]);
     listMessages.mockReset().mockResolvedValue([{ id: "m1", threadId: "thread-1" }]);
     verifyAccessToken.mockReset().mockResolvedValue({ sub: "user-1" });
-    parseAnonCookieValue.mockReset().mockReturnValue({ userId: "anon-1" });
   });
 
   it("returns 400 for missing POST input", async () => {
@@ -97,16 +91,6 @@ describe("/api/chat route", () => {
   it("returns 401 when auth is missing", async () => {
     const response = await GET(new Request("http://localhost/api/chat?userId=user-1&listThreads=1"));
     expect(response.status).toBe(401);
-  });
-
-  it("allows anonymous chat only for the matching cookie user", async () => {
-    const response = await GET(
-      new Request("http://localhost/api/chat?userId=anon-1&listThreads=1", {
-        headers: { cookie: "cityzeen-anon=value" },
-      }),
-    );
-
-    expect(response.status).toBe(200);
   });
 
   it("returns 403 when bearer token belongs to another user", async () => {

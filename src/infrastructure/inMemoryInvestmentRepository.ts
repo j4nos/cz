@@ -30,6 +30,10 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
     return { ...input };
   }
 
+  async deleteUserProfile(id: string): Promise<void> {
+    this.userProfiles.delete(id);
+  }
+
   async createAsset(input: Asset): Promise<Asset> {
     this.assets.set(input.id, { ...input });
     return { ...input };
@@ -48,6 +52,10 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
     this.assets.delete(assetId);
   }
 
+  async listAssets(): Promise<Asset[]> {
+    return Array.from(this.assets.values()).map((item) => ({ ...item }));
+  }
+
   async createListing(input: Listing): Promise<Listing> {
     this.listings.set(input.id, { ...input });
     return { ...input };
@@ -57,8 +65,17 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
     return this.copyOrNull(this.listings.get(id));
   }
 
+  async updateListing(input: Listing): Promise<Listing> {
+    this.listings.set(input.id, { ...input });
+    return { ...input };
+  }
+
   async deleteListing(listingId: string): Promise<void> {
     this.listings.delete(listingId);
+  }
+
+  async listListings(): Promise<Listing[]> {
+    return Array.from(this.listings.values()).map((item) => ({ ...item }));
   }
 
   async createProduct(input: Product): Promise<Product> {
@@ -77,6 +94,12 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
 
   async deleteProduct(productId: string): Promise<void> {
     this.products.delete(productId);
+  }
+
+  async listProductsByListingId(listingId: string): Promise<Product[]> {
+    return Array.from(this.products.values())
+      .filter((product) => product.listingId === listingId)
+      .map((product) => ({ ...product }));
   }
 
   async createOrder(input: Order): Promise<Order> {
@@ -138,6 +161,18 @@ export class InMemoryInvestmentRepository implements InvestmentRepository {
   async updateOrder(order: Order): Promise<Order> {
     this.orders.set(order.id, { ...order });
     return { ...order };
+  }
+
+  async listOrdersByInvestor(investorId: string): Promise<Order[]> {
+    return Array.from(this.orders.values())
+      .filter((order) => order.investorId === investorId)
+      .map((order) => ({ ...order }));
+  }
+
+  async listOrdersByProvider(providerUserId: string): Promise<Order[]> {
+    return Array.from(this.orders.values())
+      .filter((order) => order.providerUserId === providerUserId)
+      .map((order) => ({ ...order }));
   }
 
   private copyOrNull<T>(value: T | undefined): T | null {

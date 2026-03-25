@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   mapPowensPaymentStateToOrderStatus,
@@ -17,21 +17,28 @@ class FakeRepository implements InvestmentRepository {
   async createUserProfile(input: ReturnType<typeof makeUserProfile>) { return input; }
   async getUserProfileById() { return makeUserProfile(); }
   async updateUserProfile(input: ReturnType<typeof makeUserProfile>) { return input; }
+  async deleteUserProfile() {}
   async createAsset(input: ReturnType<typeof makeAsset>) { return input; }
-  async getAssetById() { return makeAsset(); }
+  async getAssetById(_id: string) { return makeAsset(); }
   async updateAsset(input: ReturnType<typeof makeAsset>) { return input; }
   async deleteAsset() {}
+  async listAssets() { return [makeAsset()]; }
   async createListing(input: ReturnType<typeof makeListing>) { return input; }
-  async getListingById() { return makeListing(); }
+  async getListingById(_id: string) { return makeListing(); }
+  async updateListing(input: ReturnType<typeof makeListing>) { return input; }
   async deleteListing() {}
+  async listListings() { return []; }
   async createProduct(input: ReturnType<typeof makeProduct>) { return input; }
-  async getProductById() { return this.product; }
+  async getProductById(_id: string) { return this.product; }
   async updateProduct(input: ReturnType<typeof makeProduct>) { this.updatedProduct = input; return input; }
   async deleteProduct() {}
+  async listProductsByListingId(_listingId: string) { return [this.product]; }
   async createOrder(input: ReturnType<typeof makeOrder>) { return input; }
-  async getOrderById() { return this.orderById; }
-  async findOrderByPaymentProviderId() { return this.orderByPaymentProviderId; }
-  async getMintRequestById() { return null; }
+  async getOrderById(_id: string) { return this.orderById; }
+  async findOrderByPaymentProviderId(_paymentProviderId: string) { return this.orderByPaymentProviderId; }
+  async listOrdersByInvestor(_investorId: string) { return [this.orderById]; }
+  async listOrdersByProvider(_providerUserId: string) { return [this.orderById]; }
+  async getMintRequestById(_id: string) { return null; }
   async createMintRequestIfMissing() { return { request: null, created: false as const }; }
   async updateMintRequest(input: never) { return input; }
   async updateOrder(input: ReturnType<typeof makeOrder>) { this.updatedOrder = input; return input; }
@@ -51,7 +58,7 @@ describe("PowensPaymentSyncService", () => {
   it("returns null when no order matches the payment provider id", async () => {
     const repository = new FakeRepository();
     repository.orderByPaymentProviderId = null as never;
-    const service = new PowensPaymentSyncService(repository);
+    const service = new PowensPaymentSyncService(repository, async ({ orderId }) => makeOrder({ id: orderId }));
 
     await expect(service.syncByPaymentProviderId({ paymentProviderId: "missing", paymentState: "done" })).resolves.toBeNull();
   });
@@ -59,7 +66,19 @@ describe("PowensPaymentSyncService", () => {
   it("completes pending orders when Powens marks them done", async () => {
     const repository = new FakeRepository();
     repository.orderById = makeOrder({ id: "order-1", productId: "product-1", quantity: 2, status: "pending" });
-    const service = new PowensPaymentSyncService(repository);
+    const completeOrderPayment = vi.fn(async ({ orderId }: { orderId: string }) => {
+      const order = await repository.getOrderById(orderId);
+      const product = await repository.getProductById(order!.productId);
+      await repository.updateProduct({
+        ...product!,
+        remainingSupply: product!.remainingSupply - order!.quantity,
+      });
+      return {
+        ...order!,
+        status: "paid" as const,
+      };
+    });
+    const service = new PowensPaymentSyncService(repository, completeOrderPayment);
 
     const result = await service.syncByOrderId({ orderId: "order-1", paymentState: "done" });
 
@@ -70,7 +89,7 @@ describe("PowensPaymentSyncService", () => {
   it("marks rejected or cancelled payments as failed", async () => {
     const repository = new FakeRepository();
     repository.orderByPaymentProviderId = makeOrder({ status: "pending", paymentProviderId: "payment-1" });
-    const service = new PowensPaymentSyncService(repository);
+    const service = new PowensPaymentSyncService(repository, async ({ orderId }) => makeOrder({ id: orderId }));
 
     const result = await service.syncByPaymentProviderId({ paymentProviderId: "payment-1", paymentState: "cancelled" });
 
@@ -80,7 +99,7 @@ describe("PowensPaymentSyncService", () => {
   it("keeps pending-like states as pending", async () => {
     const repository = new FakeRepository();
     repository.orderByPaymentProviderId = makeOrder({ status: "pending", paymentProviderId: "payment-1" });
-    const service = new PowensPaymentSyncService(repository);
+    const service = new PowensPaymentSyncService(repository, async ({ orderId }) => makeOrder({ id: orderId }));
 
     const result = await service.syncByPaymentProviderId({ paymentProviderId: "payment-1", paymentState: "accepted" });
 
@@ -90,7 +109,7 @@ describe("PowensPaymentSyncService", () => {
   it("preserves the existing order status for unknown payment states", async () => {
     const repository = new FakeRepository();
     repository.orderByPaymentProviderId = makeOrder({ status: "paid", paymentProviderId: "payment-1", paymentProviderStatus: "done" });
-    const service = new PowensPaymentSyncService(repository);
+    const service = new PowensPaymentSyncService(repository, async ({ orderId }) => makeOrder({ id: orderId }));
 
     const result = await service.syncByPaymentProviderId({ paymentProviderId: "payment-1", paymentState: "mystery" });
 

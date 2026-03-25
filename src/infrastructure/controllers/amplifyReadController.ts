@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReadPort } from "@/src/application/interfaces/readPort";
-import { stripProductCoupons } from "@/src/application/use-cases/productCoupons";
+import { stripProductCoupons } from "@/src/domain/policies/productCouponPolicy";
 
 type ReadRepository = Pick<
   ReadPort,

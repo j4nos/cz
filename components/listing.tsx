@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { useCouponPreview } from "@/components/useCouponPreview";
 import type { CouponPreview } from "@/src/application/dto/couponPreview";
-import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 import type { PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
 import type { Listing as ListingType, Product } from "@/src/domain/entities";
+import { createReadPort } from "@/src/presentation/composition/client";
 
 type Props = {
   listingId?: string;
@@ -27,7 +27,7 @@ export function Listing({
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const readController = useMemo(() => createReadController(), []);
+  const readController = useMemo(() => createReadPort(), []);
 
   const derivedListingId =
     listingId ?? initialListing?.id ?? initialListingWithAsset?.listing.id ?? "";

@@ -23,11 +23,12 @@ export class AmplifyInvestmentRepository
   constructor(
     client: AmplifyDataClient = createAmplifyDataClient(),
     readAuthMode?: AmplifyReadAuthMode,
+    authToken?: string,
   ) {
     this.userProfiles = new AmplifyUserProfileRepository(client);
-    this.assets = new AmplifyAssetRepository(client, readAuthMode);
-    this.catalog = new AmplifyCatalogRepository(client, readAuthMode);
-    this.orders = new AmplifyOrderRepository(client, readAuthMode);
+    this.assets = new AmplifyAssetRepository(client, readAuthMode, authToken);
+    this.catalog = new AmplifyCatalogRepository(client, readAuthMode, authToken);
+    this.orders = new AmplifyOrderRepository(client, readAuthMode, authToken);
     this.blog = new AmplifyBlogRepository(client, readAuthMode);
   }
 
@@ -41,6 +42,10 @@ export class AmplifyInvestmentRepository
 
   updateUserProfile(input: Parameters<AmplifyUserProfileRepository["updateUserProfile"]>[0]) {
     return this.userProfiles.updateUserProfile(input);
+  }
+
+  deleteUserProfile(id: string) {
+    return this.userProfiles.deleteUserProfile(id);
   }
 
   createAsset(input: Parameters<AmplifyAssetRepository["createAsset"]>[0]) {

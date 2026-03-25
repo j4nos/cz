@@ -127,6 +127,22 @@ export function createAmplifyAuthClient(repository: UserProfileRepository): Auth
         return null;
       }
     },
+    async getCurrentGroups() {
+      try {
+        ensureAmplifyConfigured();
+        const session = await fetchAuthSession();
+        const groupsClaim = session.tokens?.idToken?.payload?.["cognito:groups"];
+        if (Array.isArray(groupsClaim)) {
+          return groupsClaim.filter((value): value is string => typeof value === "string");
+        }
+        if (typeof groupsClaim === "string") {
+          return [groupsClaim];
+        }
+        return [];
+      } catch {
+        return [];
+      }
+    },
     async signInWithEmailAndPassword(email: string, password: string) {
       ensureAmplifyConfigured();
       const result = await signIn({ username: email, password });

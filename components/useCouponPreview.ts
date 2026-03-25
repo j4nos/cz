@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import type { CouponPreview } from "@/src/application/dto/couponPreview";
+import { previewCouponRequest } from "@/src/presentation/composition/client";
 
 type UseCouponPreviewInput = {
   productId?: string;
@@ -37,22 +38,12 @@ export function useCouponPreview({
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       void (async () => {
-        const response = await fetch("/api/coupons/preview", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            productId,
-            coupon: normalizedCoupon,
-            quantity: previewQuantity,
-          }),
+        const payload = await previewCouponRequest({
+          productId,
+          coupon: normalizedCoupon,
+          quantity: previewQuantity,
           signal: controller.signal,
         });
-        const payload = (await response.json()) as CouponPreview & {
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(payload.error || "Failed to preview coupon.");
-        }
         if (!controller.signal.aborted) {
           setCouponPreview(payload);
         }

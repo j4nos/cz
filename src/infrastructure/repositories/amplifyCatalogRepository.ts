@@ -15,12 +15,21 @@ export class AmplifyCatalogRepository {
   constructor(
     private readonly client: AmplifyDataClient,
     private readonly readAuthMode?: AmplifyReadAuthMode,
+    private readonly authToken?: string,
   ) {}
 
   private withReadAuth(input?: Record<string, unknown>) {
     return {
       ...(input ?? {}),
       ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+      ...(this.authToken ? { authToken: this.authToken } : {}),
+    };
+  }
+
+  private withWriteAuth(input?: Record<string, unknown>) {
+    return {
+      ...(input ?? {}),
+      ...(this.authToken ? ({ authMode: "lambda" as const, authToken: this.authToken }) : {}),
     };
   }
 
@@ -49,11 +58,12 @@ export class AmplifyCatalogRepository {
     }
 
     const records = await listAll<Schema["ProductCoupon"]["type"]>((nextToken) =>
-      productCouponModel.list({
-        filter: { productId: { eq: productId } },
-        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
-        ...(nextToken ? { nextToken } : {}),
-      }),
+      productCouponModel.list(
+        this.withReadAuth({
+          filter: { productId: { eq: productId } },
+          ...(nextToken ? { nextToken } : {}),
+        }),
+      ),
     );
 
     return records.map(mapProductCouponRecord);
@@ -67,14 +77,16 @@ export class AmplifyCatalogRepository {
     }
 
     const existing = await listAll<Schema["ProductCoupon"]["type"]>((nextToken) =>
-      productCouponModel.list({
-        filter: { productId: { eq: product.id } },
-        ...(nextToken ? { nextToken } : {}),
-      }),
+      productCouponModel.list(
+        this.withReadAuth({
+          filter: { productId: { eq: product.id } },
+          ...(nextToken ? { nextToken } : {}),
+        }),
+      ),
     );
 
     await Promise.all(
-      existing.map((coupon) => productCouponModel.delete({ id: coupon.id })),
+      existing.map((coupon) => productCouponModel.delete({ id: coupon.id }, this.withWriteAuth())),
     );
 
     await Promise.all(
@@ -84,7 +96,7 @@ export class AmplifyCatalogRepository {
           productId: product.id,
           code: coupon.code,
           discountedUnitPrice: coupon.discountedUnitPrice,
-        }),
+        }, this.withWriteAuth()),
       ),
     );
   }
@@ -102,7 +114,7 @@ export class AmplifyCatalogRepository {
       saleStatus: input.saleStatus,
       saleStartDate: input.startsAt,
       saleEndDate: input.endsAt,
-    });
+    }, this.withWriteAuth());
 
     return response.data ? mapListingRecord(response.data) : input;
   }
@@ -128,13 +140,13 @@ export class AmplifyCatalogRepository {
       saleStatus: listing.saleStatus,
       saleStartDate: listing.startsAt,
       saleEndDate: listing.endsAt,
-    });
+    }, this.withWriteAuth());
 
     return response.data ? mapListingRecord(response.data) : listing;
   }
 
   async deleteListing(listingId: string): Promise<void> {
-    await this.client.models.Listing.delete({ id: listingId });
+    await this.client.models.Listing.delete({ id: listingId }, this.withWriteAuth());
   }
 
   async listListings(): Promise<Listing[]> {
@@ -158,7 +170,7 @@ export class AmplifyCatalogRepository {
       eligibleInvestorType: input.eligibleInvestorType,
       supplyTotal: input.supplyTotal,
       remainingSupply: input.remainingSupply,
-    });
+    }, this.withWriteAuth());
     const product = response.data ? mapProductRecord(response.data, input.coupons) : input;
     await this.replaceCoupons(product);
     return product;
@@ -188,7 +200,7 @@ export class AmplifyCatalogRepository {
       eligibleInvestorType: product.eligibleInvestorType,
       supplyTotal: product.supplyTotal,
       remainingSupply: product.remainingSupply,
-    });
+    }, this.withWriteAuth());
     const saved = response.data ? mapProductRecord(response.data, product.coupons) : product;
     await this.replaceCoupons(saved);
     return saved;
@@ -198,25 +210,28 @@ export class AmplifyCatalogRepository {
     const productCouponModel = this.productCouponModel;
     if (productCouponModel) {
       const existingCoupons = await listAll<Schema["ProductCoupon"]["type"]>((nextToken) =>
-        productCouponModel.list({
-          filter: { productId: { eq: productId } },
-          ...(nextToken ? { nextToken } : {}),
-        }),
+        productCouponModel.list(
+          this.withReadAuth({
+            filter: { productId: { eq: productId } },
+            ...(nextToken ? { nextToken } : {}),
+          }),
+        ),
       );
       await Promise.all(
-        existingCoupons.map((coupon) => productCouponModel.delete({ id: coupon.id })),
+        existingCoupons.map((coupon) => productCouponModel.delete({ id: coupon.id }, this.withWriteAuth())),
       );
     }
-    await this.client.models.Product.delete({ id: productId });
+    await this.client.models.Product.delete({ id: productId }, this.withWriteAuth());
   }
 
   async listProductsByListingId(listingId: string): Promise<Product[]> {
     const records = await listAll<Schema["Product"]["type"]>((nextToken) =>
-      this.client.models.Product.list({
-        filter: { listingId: { eq: listingId } },
-        ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
-        ...(nextToken ? { nextToken } : {}),
-      }),
+      this.client.models.Product.list(
+        this.withReadAuth({
+          filter: { listingId: { eq: listingId } },
+          ...(nextToken ? { nextToken } : {}),
+        }),
+      ),
     );
     return Promise.all(
       records.map(async (record) => {

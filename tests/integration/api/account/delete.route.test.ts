@@ -2,9 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const verifyAccessToken = vi.fn();
-const ensureAmplifyConfigured = vi.fn();
-const generateClient = vi.fn();
-const sendMock = vi.fn();
+const deleteAccount = vi.fn();
 
 const makeRequest = (withBearer = true) =>
   new Request("http://localhost/api/account/delete", {
@@ -23,15 +21,10 @@ async function loadRoute(userPoolId: string) {
     },
   }));
   vi.doMock("@/src/infrastructure/auth/verifyAccessToken", () => ({ verifyAccessToken }));
-  vi.doMock("@/src/config/amplify", () => ({ ensureAmplifyConfigured }));
-  vi.doMock("aws-amplify/data", () => ({ generateClient }));
-  vi.doMock("@aws-sdk/client-cognito-identity-provider", () => ({
-    CognitoIdentityProviderClient: class {
-      send = sendMock;
-    },
-    AdminDeleteUserCommand: class {
-      constructor(public readonly input: unknown) {}
-    },
+  vi.doMock("@/src/infrastructure/composition/defaults", () => ({
+    createDeleteAccountService: () => ({
+      deleteAccount,
+    }),
   }));
 
   return import("@/app/api/account/delete/route");
@@ -40,9 +33,7 @@ async function loadRoute(userPoolId: string) {
 describe("POST /api/account/delete", () => {
   beforeEach(() => {
     verifyAccessToken.mockReset().mockResolvedValue({ sub: "user-1", email: "user@example.com" });
-    ensureAmplifyConfigured.mockReset();
-    generateClient.mockReset().mockReturnValue({ models: { UserProfile: { delete: vi.fn().mockResolvedValue({}) } } });
-    sendMock.mockReset().mockResolvedValue({});
+    deleteAccount.mockReset().mockResolvedValue(undefined);
   });
 
   it("returns 500 when the user pool config is missing", async () => {
@@ -68,29 +59,22 @@ describe("POST /api/account/delete", () => {
     expect(response.status).toBe(401);
   });
 
-  it("deletes the user by user id when possible", async () => {
-    const client = { models: { UserProfile: { delete: vi.fn().mockResolvedValue({}) } } };
-    generateClient.mockReturnValue(client);
+  it("delegates deletion to the backend service", async () => {
     const { POST } = await loadRoute("pool-1");
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(200);
-    expect(client.models.UserProfile.delete).toHaveBeenCalledWith({ id: "user-1" });
-    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(deleteAccount).toHaveBeenCalledWith({
+      userId: "user-1",
+      email: "user@example.com",
+      userPoolId: "pool-1",
+      region: "eu-central-1",
+    });
     await expect(response.json()).resolves.toEqual({ status: "deleted" });
   });
 
-  it("falls back to deleting by email when the user id deletion fails", async () => {
-    sendMock.mockRejectedValueOnce(new Error("not found")).mockResolvedValueOnce({});
-    const { POST } = await loadRoute("pool-1");
-    const response = await POST(makeRequest());
-
-    expect(response.status).toBe(200);
-    expect(sendMock).toHaveBeenCalledTimes(2);
-  });
-
-  it("returns 500 when both delete attempts fail", async () => {
-    sendMock.mockRejectedValue(new Error("boom"));
+  it("returns 500 when the backend service fails", async () => {
+    deleteAccount.mockRejectedValue(new Error("boom"));
     const { POST } = await loadRoute("pool-1");
     const response = await POST(makeRequest());
 

@@ -1,11 +1,8 @@
 "use client";
 
-import { generateClient } from "aws-amplify/data";
-import { uploadData } from "aws-amplify/storage";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import type { Schema } from "@/amplify/data/resource";
 import { PlainCta } from "@/components/sections/PlainCta";
 import { AppLink } from "@/components/ui/AppLink";
 import { Button } from "@/components/ui/Button";
@@ -17,16 +14,14 @@ import { useLoading } from "@/contexts/LoadingContext";
 import { useToast } from "@/contexts/ToastContext";
 import {
   buildUpdatedAssetBasics,
-  mergeAssetImagePaths,
 } from "@/src/application/use-cases/assetUpdateAssembler";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
 import type { Asset, Listing } from "@/src/domain/entities";
-import { createAssetController } from "@/src/infrastructure/controllers/createAssetController";
-import { createReadController } from "@/src/infrastructure/controllers/createReadController";
 import {
-  assetImagePrefix,
-  toSafeFileName,
-} from "@/src/infrastructure/storage/publicUrls";
+  createAssetPort,
+  createReadPort,
+  revalidateListingEntries,
+  uploadAssetPhotos,
+} from "@/src/presentation/composition/client";
 
 type AssetView = Asset & {
   documents?: Array<{ id: string; name: string }>;
@@ -41,6 +36,8 @@ export function AssetProviderAsset({ assetId }: Props) {
   const { accessToken } = useAuth();
   const { setLoading } = useLoading();
   const { setToast } = useToast();
+  const readController = useMemo(() => createReadPort(), []);
+  const assetController = useMemo(() => createAssetPort(), []);
   const [asset, setAsset] = useState<AssetView | null | undefined>(undefined);
   const [assetListings, setAssetListings] = useState<Listing[]>([]);
   const [photos, setPhotos] = useState<File[]>([]);
@@ -57,10 +54,9 @@ export function AssetProviderAsset({ assetId }: Props) {
     async function load() {
       setLoading("asset-provider-asset", true);
       try {
-        const controller = createReadController();
         const [nextAsset, nextListings] = await Promise.all([
-          controller.getAssetById(assetId),
-          controller.listListingsByAssetId(assetId),
+          readController.getAssetById(assetId),
+          readController.listListingsByAssetId(assetId),
         ]);
         setAsset(nextAsset as AssetView | null);
         if (nextAsset) {
@@ -77,7 +73,7 @@ export function AssetProviderAsset({ assetId }: Props) {
     }
 
     void load();
-  }, [assetId, setLoading]);
+  }, [assetId, readController, setLoading]);
 
   async function uploadPhoto(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,41 +84,8 @@ export function AssetProviderAsset({ assetId }: Props) {
     setUploadingPhoto(true);
     try {
       setLoading("asset-provider-asset-upload-photo", true);
-      ensureAmplifyConfigured();
-      const client = generateClient<Schema>();
-      const startIndex = asset.imageUrls.length + 1;
-
-      const uploadedPaths = await Promise.all(
-        photos.map(async (file, offset) => {
-          const fileName = `${Date.now()}-${startIndex + offset}-${toSafeFileName(
-            file.name
-          )}`;
-          const path = `${assetImagePrefix(asset.id)}${fileName}`;
-          await uploadData({
-            path,
-            data: file,
-            options: {
-              contentType: file.type || undefined,
-            },
-          }).result;
-          return path;
-        })
-      );
-
-      const merged = mergeAssetImagePaths({
-        asset,
-        uploadedPaths,
-      });
-
-      await client.models.Asset.update({
-        id: asset.id,
-        imageUrls: merged.storedPaths,
-      });
-
-      setAsset({
-        ...asset,
-        imageUrls: merged.publicUrls,
-      });
+      const updatedAsset = await uploadAssetPhotos({ asset, files: photos });
+      setAsset(updatedAsset);
       setPhotos([]);
       setToast("Photo uploaded.", "success", 2500);
     } catch {
@@ -150,7 +113,7 @@ export function AssetProviderAsset({ assetId }: Props) {
     setSavingBasics(true);
     try {
       setLoading("asset-provider-asset-save", true);
-      const updated = await createAssetController().updateAsset(
+      const updated = await assetController.updateAsset(
         buildUpdatedAssetBasics({
           asset,
           name,
@@ -161,13 +124,9 @@ export function AssetProviderAsset({ assetId }: Props) {
         })
       );
       setAsset(updated as AssetView);
-      await fetch("/api/asset-provider/revalidate-listings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({ listingIds: assetListings.map((listing) => listing.id) }),
+      await revalidateListingEntries({
+        accessToken,
+        listingIds: assetListings.map((listing) => listing.id),
       });
       setToast("Asset basics updated.", "success");
     } catch {
@@ -191,7 +150,7 @@ export function AssetProviderAsset({ assetId }: Props) {
     setDeletingAsset(true);
     try {
       setLoading("asset-provider-asset-delete", true);
-      await createAssetController().deleteAsset(asset.id);
+      await assetController.deleteAsset(asset.id);
       setToast("Asset deleted.", "success");
       router.push("/asset-provider/assets");
     } catch {

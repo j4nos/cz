@@ -7,6 +7,7 @@ sequenceDiagram
   participant AssetController as AssetController
   participant ListingController as ListingController
   participant PricingController as PricingController
+  participant ListingOpenPolicy as listingOpenPolicy
   participant Service as InvestmentPlatformService
   participant Repo as AmplifyInvestmentRepository
   participant SubmitApi as /api/assets/submit
@@ -24,6 +25,8 @@ sequenceDiagram
   AssetController-->>UI: Asset
 
   AssetProvider->>UI: create / edit listing
+  UI->>ListingOpenPolicy: getListingOpenRequirementError(listing, asset, products)
+  ListingOpenPolicy-->>UI: string | undefined
   UI->>ListingController: createListingDraft(...) or saveListingDraft(...)
   ListingController->>Service: createListing(...)
   Service->>Repo: getAssetById(assetId)
@@ -61,12 +64,15 @@ sequenceDiagram
   participant CheckoutUI as Checkout page
   participant CheckoutService as CheckoutService
   participant OrderController as OrderController
+  participant ProductCouponPolicy as productCouponPolicy
   participant Service as InvestmentPlatformService
   participant Repo as AmplifyInvestmentRepository
   participant PowensApi as /api/powens/create-payment
 
   Visitor->>ListingUI: open listing
   Visitor->>ListingUI: select product / quantity / coupon
+  ListingUI->>ProductCouponPolicy: normalizeCouponCode(coupon)
+  ProductCouponPolicy-->>ListingUI: normalized coupon
   ListingUI-->>Visitor: go to checkout route
 
   Visitor->>CheckoutUI: open checkout
@@ -94,6 +100,8 @@ sequenceDiagram
     Repo-->>Service: Product
     Service->>Repo: getAssetById(listing.assetId)
     Repo-->>Service: Asset
+    Service->>ProductCouponPolicy: getCouponPricing(product, coupon)
+    ProductCouponPolicy-->>Service: pricing result
     Service->>Repo: createOrder(Order status=pending)
     Repo-->>Service: Order
     OrderController-->>CheckoutUI: Order

@@ -44,6 +44,11 @@ export class DynamoDbRequestClaimGateway implements RequestClaimPort {
     statusName: "deploymentStatus" | "mintStatus";
   }) {
     try {
+      console.info("[request-claim] attempting claim", {
+        tableName: input.tableName,
+        requestId: input.requestId,
+        statusName: input.statusName,
+      });
       await this.client.send(
         new UpdateItemCommand({
           TableName: input.tableName,
@@ -71,6 +76,16 @@ export class DynamoDbRequestClaimGateway implements RequestClaimPort {
     } catch (error) {
       if (error instanceof ConditionalCheckFailedException) {
         return false;
+      }
+      const errorName =
+        typeof error === "object" && error && "name" in error ? String((error as { name?: unknown }).name) : "";
+      if (process.env.NODE_ENV !== "production" && errorName === "ResourceNotFoundException") {
+        console.warn("[request-claim] table not found, skipping claim in non-production", {
+          tableName: input.tableName,
+          requestId: input.requestId,
+          statusName: input.statusName,
+        });
+        return true;
       }
       throw error;
     }

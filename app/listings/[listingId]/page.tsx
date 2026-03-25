@@ -1,5 +1,5 @@
 import { Listing } from "@/components/listing";
-import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
+import { createPublicContentReader } from "@/src/presentation/composition/server";
 import { notFound } from "next/navigation";
 
 export const dynamicParams = true;

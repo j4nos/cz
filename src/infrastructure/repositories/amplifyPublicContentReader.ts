@@ -1,7 +1,7 @@
 import type { BlogPost } from "@/src/domain/entities/content";
 import type { Product } from "@/src/domain/entities";
 import type { PublicContentReader, PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
-import { stripProductCoupons } from "@/src/application/use-cases/productCoupons";
+import { stripProductCoupons } from "@/src/domain/policies/productCouponPolicy";
 
 type PublicContentRepository = {
   listListings(): Promise<PublicListingWithAsset["listing"][]>;

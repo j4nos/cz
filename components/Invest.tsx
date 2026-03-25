@@ -23,10 +23,7 @@ import {
   type CheckoutPaymentType,
 } from "@/src/application/use-cases/checkoutRules";
 import type { CouponPreview } from "@/src/application/dto/couponPreview";
-import { CheckoutService } from "@/src/application/use-cases/checkoutService";
-import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
-import { createInvestmentPlatformService } from "@/src/infrastructure/composition/defaults";
-import { createReadController } from "@/src/infrastructure/controllers/createReadController";
+import { createCheckoutService } from "@/src/presentation/composition/client";
 import type { Asset, Listing, Product } from "@/src/domain/entities";
 
 type Props = {
@@ -52,32 +49,7 @@ export function Invest({
   const { activeUser, loading: authLoading, accessToken } = useAuth();
   const { setToast } = useToast();
   const { setLoading } = useLoading();
-  const readController = useMemo(() => createReadController(), []);
-  const authClient = useMemo(() => createAuthClient(), []);
-  const checkoutService = useMemo(
-    () =>
-      new CheckoutService(
-        readController,
-        createInvestmentPlatformService(),
-        authClient,
-        async ({ orderId, accessToken: currentAccessToken }) => {
-          const response = await fetch("/api/powens/create-payment", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${currentAccessToken}`,
-            },
-            body: JSON.stringify({ orderId }),
-          });
-          const payload = (await response.json()) as {
-            redirectUrl?: string;
-            error?: string;
-          };
-          return payload;
-        },
-      ),
-    [authClient, readController],
-  );
+  const checkoutService = useMemo(() => createCheckoutService(), []);
 
   const [listing, setListing] = useState<Listing | null>(null);
   const [asset, setAsset] = useState<Asset | null>(null);

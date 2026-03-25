@@ -2,56 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import {
-  BlogPostForm,
-} from "@/components/platform-admin/BlogPostForm";
+import { BlogPostForm } from "@/components/platform-admin/BlogPostForm";
 import { BlogPostsTable } from "@/components/platform-admin/BlogPostsTable";
-import type { Schema } from "@/amplify/data/resource";
-import { generateClient } from "aws-amplify/data";
-import { uploadData } from "aws-amplify/storage";
 import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
-import {
-  BlogPostAdminService,
-  type BlogPostEditorInput,
-} from "@/src/application/use-cases/blogPostAdminService";
+import { type BlogPostEditorInput } from "@/src/application/use-cases/blogPostAdminService";
 import type { BlogPost } from "@/src/domain/entities/content";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
-import { createBlogAdminController } from "@/src/infrastructure/controllers/createBlogAdminController";
-import { blogCoverPrefix, toSafeFileName } from "@/src/infrastructure/storage/publicUrls";
+import { createBlogPostAdminService } from "@/src/presentation/composition/client";
 
 export default function PlatformAdminBlogPostsPage() {
   const { accessToken } = usePrivateAuth();
   const { setToast } = useToast();
-  const controller = useMemo(() => createBlogAdminController(), []);
-  const blogPostAdminService = useMemo(
-    () =>
-      new BlogPostAdminService(controller, async ({ postId, file }) => {
-        ensureAmplifyConfigured();
-        const client = generateClient<Schema>();
-        const fileName = `${Date.now()}-${toSafeFileName(file.name)}`;
-        const path = `${blogCoverPrefix(postId)}${fileName}`;
-        await uploadData({
-          path,
-          data: file,
-          options: {
-            contentType: file.type || undefined,
-          },
-        }).result;
-        const response = await client.models.BlogPost.update(
-          {
-            id: postId,
-            coverImage: path,
-          },
-          { authMode: "userPool" },
-        );
-        if (!response.data) {
-          throw new Error(response.errors?.[0]?.message || "Failed to update blog cover image.");
-        }
-        return path;
-      }),
-    [controller],
-  );
+  const blogPostAdminService = useMemo(() => createBlogPostAdminService(), []);
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);

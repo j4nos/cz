@@ -157,10 +157,13 @@ describe("POST /api/powens/create-payment", () => {
         "https://sandbox.biapi.pro/2.0/auth/webview/payment?payment_id=987&client_id=client-id&code=payment-token",
       paymentId: "987",
     });
-    expect(client.models.Order.update).toHaveBeenCalledWith({
-      id: "order-1",
-      paymentProviderId: "987",
-      paymentProviderStatus: "created",
-    });
+    expect(client.models.Order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "order-1",
+        paymentProviderId: "987",
+        paymentProviderStatus: "created",
+      }),
+      { authMode: "lambda", authToken: "token" },
+    );
   });
 });

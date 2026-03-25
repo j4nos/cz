@@ -6,32 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput } from "@/components/ui/Form";
 import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
-import { AccountSettingsService } from "@/src/application/use-cases/accountSettingsService";
-import { createAuthClient } from "@/src/infrastructure/auth/createAuthClient";
+import { createAccountSettingsService } from "@/src/presentation/composition/client";
 
 export default function AssetProviderSettingsPage() {
   const { user, profile, logout, accessToken } = usePrivateAuth();
   const router = useRouter();
   const { setToast } = useToast();
-  const accountSettingsService = useMemo(
-    () =>
-      new AccountSettingsService(
-        createAuthClient(),
-        async (currentAccessToken) => {
-          const response = await fetch("/api/account/delete", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${currentAccessToken}`,
-            },
-          });
-          if (!response.ok) {
-            throw new Error("Delete failed.");
-          }
-        },
-      ),
-    [],
-  );
+  const accountSettingsService = useMemo(() => createAccountSettingsService(), []);
   const [companyName, setCompanyName] = useState(profile?.companyName ?? "");
   const [country, setCountry] = useState(profile?.country ?? "");
 

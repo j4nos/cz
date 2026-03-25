@@ -1,18 +1,14 @@
 "use client";
 
-import { generateClient } from "aws-amplify/data";
-import { uploadData } from "aws-amplify/storage";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import type { Schema } from "@/amplify/data/resource";
 import { Button } from "@/components/ui/Button";
 import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
 import { useToast } from "@/contexts/ToastContext";
 import { usePrivateAuth } from "@/contexts/AuthContext";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
-import { assetDocPrefix, toSafeFileName } from "@/src/infrastructure/storage/publicUrls";
+import { uploadAssetDocument } from "@/src/presentation/composition/client";
 
 export function Step3PageContent({ assetId }: { assetId: string }) {
   const router = useRouter();
@@ -36,25 +32,11 @@ export function Step3PageContent({ assetId }: { assetId: string }) {
       return;
     }
 
-    const fileName = `${Date.now()}-${toSafeFileName(file.name)}`;
-    const path = `${assetDocPrefix(assetId)}${fileName}`;
-    await uploadData({
-      path,
-      data: file,
-      options: {
-        contentType: file.type || undefined,
-      },
-    }).result;
-
-    ensureAmplifyConfigured();
-    const client = generateClient<Schema>();
-    await client.models.DocumentMeta.create({
+    await uploadAssetDocument({
       assetId,
       uploadedByUserId: user.uid,
       type: docType,
-      name: file.name,
-      status: "uploaded",
-      createdAt: new Date().toISOString(),
+      file,
     });
 
     setToast("Document uploaded", "success", 2000);

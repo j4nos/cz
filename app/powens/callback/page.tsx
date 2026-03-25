@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { AppLink } from "@/components/ui/AppLink";
 import { Badge } from "@/components/ui/Badge";
@@ -9,7 +9,10 @@ import { KeyValueList } from "@/components/ui/KeyValueList";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLoading } from "@/contexts/LoadingContext";
 import type { Order } from "@/src/domain/entities";
-import { createReadController } from "@/src/infrastructure/controllers/createReadController";
+import {
+  createReadPort,
+  fetchPowensPaymentStatusClient,
+} from "@/src/presentation/composition/client";
 
 export default function PowensReturnPage() {
   return (
@@ -37,6 +40,7 @@ function PowensReturnContent() {
   const params = useSearchParams();
   const { accessToken } = useAuth();
   const { setLoading } = useLoading();
+  const readController = useMemo(() => createReadPort(), []);
   const [order, setOrder] = useState<Order | null>(null);
 
   const orderId = params.get("state") || "";
@@ -54,7 +58,7 @@ function PowensReturnContent() {
 
       setLoading("powens-order", true);
       try {
-        const next = await createReadController().getOrderById(orderId);
+        const next = await readController.getOrderById(orderId);
         if (active) {
           setOrder(next);
         }
@@ -68,7 +72,7 @@ function PowensReturnContent() {
     return () => {
       active = false;
     };
-  }, [orderId, setLoading]);
+  }, [orderId, readController, setLoading]);
 
   useEffect(() => {
     let active = true;
@@ -80,18 +84,11 @@ function PowensReturnContent() {
 
       setLoading("powens-status", true);
       try {
-        await fetch("/api/powens/payment-status", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ orderId }),
-        });
+        await fetchPowensPaymentStatusClient({ orderId, accessToken });
         if (!active) {
           return;
         }
-        const next = await createReadController().getOrderById(orderId);
+        const next = await readController.getOrderById(orderId);
         if (active) {
           setOrder(next);
         }
@@ -107,7 +104,7 @@ function PowensReturnContent() {
     return () => {
       active = false;
     };
-  }, [accessToken, orderId, setLoading]);
+  }, [accessToken, orderId, readController, setLoading]);
 
   const effectivePaymentStatus = paymentState || order?.paymentProviderStatus || "—";
   const orderStatus = order?.status || "—";

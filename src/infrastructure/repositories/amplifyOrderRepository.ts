@@ -12,12 +12,21 @@ export class AmplifyOrderRepository {
   constructor(
     private readonly client: AmplifyDataClient,
     private readonly readAuthMode?: AmplifyReadAuthMode,
+    private readonly authToken?: string,
   ) {}
 
   private withReadAuth(input?: Record<string, unknown>) {
     return {
       ...(input ?? {}),
       ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+      ...(this.authToken ? { authToken: this.authToken } : {}),
+    };
+  }
+
+  private withWriteAuth(input?: Record<string, unknown>) {
+    return {
+      ...(input ?? {}),
+      ...(this.authToken ? ({ authMode: "lambda" as const, authToken: this.authToken }) : {}),
     };
   }
 
@@ -43,7 +52,7 @@ export class AmplifyOrderRepository {
       paymentProviderStatus: input.paymentProviderStatus,
       coupon: input.coupon,
       investorWalletAddress: input.investorWalletAddress,
-    });
+    }, this.withWriteAuth());
 
     return response.data ? mapOrderRecord(response.data) : input;
   }
@@ -61,6 +70,7 @@ export class AmplifyOrderRepository {
       this.client.models.Order.list({
         filter: { paymentProviderId: { eq: paymentProviderId } },
         ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+        ...(this.authToken ? { authToken: this.authToken } : {}),
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -87,7 +97,7 @@ export class AmplifyOrderRepository {
       withdrawnAt: order.withdrawnAt,
       providerConfirmedAt: order.providerConfirmedAt,
       providerConfirmedBy: order.providerConfirmedBy,
-    });
+    }, this.withWriteAuth());
 
     return response.data ? mapOrderRecord(response.data) : order;
   }
@@ -97,6 +107,7 @@ export class AmplifyOrderRepository {
       this.client.models.Order.list({
         filter: { investorId: { eq: investorId } },
         ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+        ...(this.authToken ? { authToken: this.authToken } : {}),
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -108,6 +119,7 @@ export class AmplifyOrderRepository {
       this.client.models.Order.list({
         filter: { providerUserId: { eq: providerUserId } },
         ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+        ...(this.authToken ? { authToken: this.authToken } : {}),
         ...(nextToken ? { nextToken } : {}),
       }),
     );
@@ -141,7 +153,7 @@ export class AmplifyOrderRepository {
         retryCount: 0,
         createdAt: input.createdAt,
         updatedAt: input.createdAt,
-      });
+      }, this.withWriteAuth());
 
       if (response.data) {
         return {
@@ -175,7 +187,7 @@ export class AmplifyOrderRepository {
       errorMessage: input.errorMessage,
       createdAt: input.createdAt,
       updatedAt: input.updatedAt,
-    });
+    }, this.withWriteAuth());
 
     return response.data ? mapMintRequestRecord(response.data) : input;
   }

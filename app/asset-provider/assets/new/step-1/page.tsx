@@ -8,7 +8,7 @@ import { Form, FormField, FormInput, FormSelect } from "@/components/ui/Form";
 import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
-import { createInvestmentRepository } from "@/src/infrastructure/composition/defaults";
+import { createSaveAssetDraftService } from "@/src/presentation/composition/client";
 
 export default function AssetWizardStep1Page() {
   return (
@@ -24,6 +24,7 @@ function Step1Content() {
   const { user } = usePrivateAuth();
   const { setToast } = useToast();
   const { state, updateState, resetState } = useAssetWizard();
+  const saveAssetDraftService = createSaveAssetDraftService();
 
   useEffect(() => {
     if (searchParams.get("fresh") !== "1") {
@@ -38,33 +39,19 @@ function Step1Content() {
     event.preventDefault();
 
     try {
-      const assetId = state.assetId || crypto.randomUUID();
-      const repository = createInvestmentRepository();
-      const existingAsset = await repository.getAssetById(assetId);
+      const result = await saveAssetDraftService.save({
+        assetId: state.assetId || crypto.randomUUID(),
+        userId: user.uid,
+        name: state.name,
+        country: state.country || "France",
+        assetClass: state.assetClass,
+        tokenStandard: state.tokenStandard,
+      });
 
-      if (existingAsset && existingAsset.tenantUserId !== user.uid) {
-        throw new Error("You cannot edit another provider's asset.");
+      if (result.kind === "error") {
+        throw new Error(result.message);
       }
-
-      const savedAsset = existingAsset
-        ? await repository.updateAsset({
-            ...existingAsset,
-            name: state.name,
-            country: state.country || "France",
-            assetClass: state.assetClass,
-            tokenStandard: state.tokenStandard,
-          })
-        : await repository.createAsset({
-            id: assetId,
-            tenantUserId: user.uid,
-          name: state.name,
-          country: state.country || "France",
-          assetClass: state.assetClass,
-          tokenStandard: state.tokenStandard,
-            status: "draft",
-            missingDocsCount: 0,
-            imageUrls: [],
-          });
+      const savedAsset = result.asset;
 
       updateState({ assetId: savedAsset.id });
       router.push(`/asset-provider/assets/new/${savedAsset.id}/step-2`);

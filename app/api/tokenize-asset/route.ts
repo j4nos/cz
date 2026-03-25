@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
-import { generateClient } from "aws-amplify/data";
 
-import type { Schema } from "@/amplify/data/resource";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
+import { createTokenizationService } from "@/src/infrastructure/composition/defaults";
 import { verifyAccessToken } from "@/src/infrastructure/auth/verifyAccessToken";
-import { EthersTokenizationGateway } from "@/src/infrastructure/gateways/ethersTokenizationGateway";
+import { DomainError } from "@/src/domain/value-objects/errors";
 
 export const runtime = "nodejs";
-
-function getClient() {
-  ensureAmplifyConfigured();
-  return generateClient<Schema>();
-}
 
 export async function POST(request: Request) {
   try {
@@ -43,34 +36,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid token." }, { status: 401 });
     }
 
-    const client = getClient();
-    const assetRes = await client.models.Asset.get({ id: cleanedAssetId });
-    if (!assetRes.data) {
-      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
-    }
-
-    if (assetRes.data.tenantUserId !== userId) {
-      return NextResponse.json({ error: "Forbidden." }, { status: 403 });
-    }
-
-    const gateway = new EthersTokenizationGateway();
-    const result = await gateway.tokenize({
+    const result = await createTokenizationService(token).tokenizeAsset({
       assetId: cleanedAssetId,
-      name: typeof name === "string" ? name : assetRes.data.name,
-      symbol: typeof symbol === "string" ? symbol : "ASSET",
+      userId,
+      name: typeof name === "string" ? name : undefined,
+      symbol: typeof symbol === "string" ? symbol : undefined,
       owner: typeof owner === "string" ? owner : undefined,
-      tokenStandard:
-        typeof tokenStandard === "string"
-          ? tokenStandard
-          : assetRes.data.tokenStandard ?? undefined,
+      tokenStandard: typeof tokenStandard === "string" ? tokenStandard : undefined,
     });
 
     return NextResponse.json({
       address: result.address,
       standard: result.standard,
       supportsErc721: result.supportsErc721,
+      runId: result.runId,
     });
   } catch (error) {
+    if (error instanceof DomainError) {
+      return NextResponse.json({ error: error.message }, { status: error.httpStatus });
+    }
+
     const message =
       error instanceof Error ? error.message : "Failed to deploy token.";
     return NextResponse.json({ error: message }, { status: 500 });

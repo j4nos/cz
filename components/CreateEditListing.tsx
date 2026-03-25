@@ -17,10 +17,9 @@ import { PlainCta } from "@/components/sections/PlainCta";
 import { Table } from "@/components/ui/Table";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
-import { getListingOpenRequirementError } from "@/src/application/use-cases/listingOpenRequirements";
+import { getListingOpenRequirementError } from "@/src/domain/policies/listingOpenPolicy";
 import type { Asset, Listing, Product } from "@/src/domain/entities";
-import { createReadController } from "@/src/infrastructure/controllers/createReadController";
-import { createListingController } from "@/src/infrastructure/controllers/createListingController";
+import { createListingEditorFacade } from "@/src/presentation/composition/client";
 import styles from "./CreateEditListing.module.css";
 
 export function CreateEditListing({
@@ -33,7 +32,7 @@ export function CreateEditListing({
   const router = useRouter();
   const { accessToken } = useAuth();
   const { setToast } = useToast();
-  const generatedListingId = useMemo(() => listingId ?? `listing-local-${Date.now()}`, [listingId]);
+  const listingEditor = useMemo(() => createListingEditorFacade(), []);
   const [currentListingId, setCurrentListingId] = useState(listingId ?? "");
   const [productsVersion, setProductsVersion] = useState(0);
   const [form, setForm] = useState<Listing | null>(null);
@@ -42,17 +41,16 @@ export function CreateEditListing({
 
   useEffect(() => {
     async function load() {
-      const controller = createReadController();
       const [nextAsset, current] = await Promise.all([
-        controller.getAssetById(assetId),
-        listingId ? controller.getListingById(listingId) : Promise.resolve(null),
+        listingEditor.getAssetById(assetId),
+        listingId ? listingEditor.getListingById(listingId) : Promise.resolve(null),
       ]);
 
       setAsset(nextAsset);
       setCurrentListingId(current?.id ?? "");
       setForm(
         current ?? {
-          id: generatedListingId,
+          id: "",
           assetId,
           title: "",
           description: "",
@@ -74,7 +72,7 @@ export function CreateEditListing({
     }
 
     void load();
-  }, [assetId, generatedListingId, listingId, productsVersion]);
+  }, [assetId, listingEditor, listingId, productsVersion]);
 
   useEffect(() => {
     async function loadProducts() {
@@ -83,13 +81,12 @@ export function CreateEditListing({
         return;
       }
 
-      const controller = createReadController();
-      const nextProducts = await controller.listProductsByListingId(currentListingId);
+      const nextProducts = await listingEditor.listProductsByListingId(currentListingId);
       setProducts(nextProducts);
     }
 
     void loadProducts();
-  }, [currentListingId, productsVersion]);
+  }, [currentListingId, listingEditor, productsVersion]);
 
   const missingRequirement = useMemo(() => {
     if (!form) {
@@ -113,6 +110,11 @@ export function CreateEditListing({
 
   function handleStatusChange(nextStatus: "open" | "closed") {
     if (!form) {
+      return;
+    }
+
+    if (!currentListingId && nextStatus === "open") {
+      setToast("Save the listing draft first. You can open it after the initial create.", "warning", 2500);
       return;
     }
 
@@ -147,21 +149,15 @@ export function CreateEditListing({
       }
     }
 
-    const controller = createListingController();
-
-    if (listingId) {
-      const saved = await controller.saveListingDraft(form);
-      setCurrentListingId(saved.id);
-      await fetch("/api/asset-provider/revalidate-listings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({ listingId: saved.id }),
+    if (currentListingId) {
+      const saved = await listingEditor.saveListingDraft({
+        listing: { ...form, id: currentListingId },
+        accessToken,
       });
+      setForm(saved);
+      setCurrentListingId(saved.id);
     } else {
-      const created = await controller.createListingDraft({
+      const created = await listingEditor.createListingDraft({
         assetId: form.assetId,
         title: form.title,
         eligibility: form.eligibility,
@@ -170,17 +166,10 @@ export function CreateEditListing({
         description: form.description,
         startsAt: form.startsAt,
         endsAt: form.endsAt,
+        accessToken,
       });
       setCurrentListingId(created.id);
       setForm(created);
-      await fetch("/api/asset-provider/revalidate-listings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({ listingId: created.id }),
-      });
       router.replace(`/asset-provider/assets/${assetId}/listings/${created.id}/edit`);
       setToast("Listing saved.", "success", 2000);
       setProductsVersion((current) => current + 1);
@@ -196,15 +185,7 @@ export function CreateEditListing({
       return;
     }
 
-    void createListingController().deleteListing(form.id);
-    void fetch("/api/asset-provider/revalidate-listings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify({ listingId: form.id }),
-    });
+    void listingEditor.deleteListing({ listingId: form.id, accessToken });
     router.push(`/asset-provider/assets/${assetId}`);
   }
 
@@ -213,7 +194,7 @@ export function CreateEditListing({
       return;
     }
 
-    void createListingController().removeProduct(productId);
+    void listingEditor.removeProduct(productId);
     setProductsVersion((current) => current + 1);
     setToast("Product removed.", "success", 2000);
     router.push(`/asset-provider/assets/${assetId}/listings/${form.id}/edit`);
@@ -225,7 +206,10 @@ export function CreateEditListing({
     }
 
     void (async () => {
-      const saved = await createListingController().saveListingDraft(form);
+      const saved = await listingEditor.saveListingDraft({
+        listing: form,
+        accessToken,
+      });
       setCurrentListingId(saved.id);
       router.push(`/asset-provider/assets/${assetId}/listings/${saved.id}/pricing`);
     })();
@@ -315,12 +299,15 @@ export function CreateEditListing({
                 handleStatusChange(event.target.value as "open" | "closed")
               }
             />
+            {!currentListingId ? (
+              <p className={styles.hint}>New listings are created as closed drafts first.</p>
+            ) : null}
             {missingRequirement ? (
               <p className={styles.hint}>Missing: {missingRequirement}</p>
             ) : null}
           </FormField>
         </FormRow>
-        <Button type="submit">Save Listing</Button>
+        <Button type="submit">{currentListingId ? "Save Listing" : "Create Draft Listing"}</Button>
       </Form>
       {currentListingId && (
         <PlainCta

@@ -16,12 +16,21 @@ export class AmplifyAssetRepository {
   constructor(
     private readonly client: AmplifyDataClient,
     private readonly readAuthMode?: AmplifyReadAuthMode,
+    private readonly authToken?: string,
   ) {}
 
   private withReadAuth(input?: Record<string, unknown>) {
     return {
       ...(input ?? {}),
       ...(this.readAuthMode ? { authMode: this.readAuthMode } : {}),
+      ...(this.authToken ? { authToken: this.authToken } : {}),
+    };
+  }
+
+  private withWriteAuth(input?: Record<string, unknown>) {
+    return {
+      ...(input ?? {}),
+      ...(this.authToken ? ({ authMode: "lambda" as const, authToken: this.authToken }) : {}),
     };
   }
 
@@ -40,7 +49,7 @@ export class AmplifyAssetRepository {
       tokenAddress: input.tokenAddress,
       latestRunId: input.latestRunId,
       imageUrls: input.imageUrls.map(normalizeStoredPublicPath),
-    });
+    }, this.withWriteAuth());
 
     return response.data ? mapAssetRecord(response.data) : input;
   }
@@ -68,13 +77,13 @@ export class AmplifyAssetRepository {
       tokenAddress: asset.tokenAddress,
       latestRunId: asset.latestRunId,
       imageUrls: asset.imageUrls.map(normalizeStoredPublicPath),
-    });
+    }, this.withWriteAuth());
 
     return response.data ? mapAssetRecord(response.data) : asset;
   }
 
   async deleteAsset(assetId: string): Promise<void> {
-    await this.client.models.Asset.delete({ id: assetId });
+    await this.client.models.Asset.delete({ id: assetId }, this.withWriteAuth());
   }
 
   async updateAssetTokenization(input: {
@@ -129,7 +138,7 @@ export class AmplifyAssetRepository {
         tokenStandard: input.tokenStandard,
         createdAt: now,
         updatedAt: now,
-      });
+      }, this.withWriteAuth());
 
       if (response.data) {
         return {
@@ -163,7 +172,7 @@ export class AmplifyAssetRepository {
       errorMessage: request.errorMessage,
       createdAt: request.createdAt,
       updatedAt: request.updatedAt,
-    });
+    }, this.withWriteAuth());
 
     return response.data ? mapContractDeploymentRequestRecord(response.data) : request;
   }

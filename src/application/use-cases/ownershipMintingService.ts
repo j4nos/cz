@@ -4,7 +4,11 @@ import {
   getMintOwnershipSuccessMessage,
 } from "@/src/application/use-cases/ownershipMinting";
 import type { Asset, Listing, Order } from "@/src/domain/entities";
-import type { ReadPort } from "@/src/application/interfaces/readPort";
+
+type OwnershipMintingReadRepository = {
+  getAssetById: (assetId: string) => Promise<Asset | null>;
+  getListingById: (listingId: string) => Promise<Listing | null>;
+};
 
 type MintResult = {
   status?: string;
@@ -16,7 +20,7 @@ type MintResult = {
 
 export class OwnershipMintingService {
   constructor(
-    private readonly readController: ReadPort,
+    private readonly repository: OwnershipMintingReadRepository,
     private readonly requestMint: (input: {
       accessToken: string;
       body: object;
@@ -28,8 +32,8 @@ export class OwnershipMintingService {
     asset: Asset | null;
     tokenAddress: string;
   }> {
-    const listing = await this.readController.getListingById(order.listingId);
-    const asset = listing ? await this.readController.getAssetById(listing.assetId) : null;
+    const listing = await this.repository.getListingById(order.listingId);
+    const asset = listing ? await this.repository.getAssetById(listing.assetId) : null;
     return {
       listing,
       asset,

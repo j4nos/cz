@@ -1,26 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppLink } from "@/components/ui/AppLink";
 import { Badge } from "@/components/ui/Badge";
 import { Table } from "@/components/ui/Table";
 import { usePrivateAuth } from "@/contexts/AuthContext";
 import type { Order, Product } from "@/src/domain/entities";
-import { createReadController } from "@/src/infrastructure/controllers/createReadController";
+import { createReadPort } from "@/src/presentation/composition/client";
 
 export default function InvestorOrdersPage() {
   const { user, loading } = usePrivateAuth();
+  const readController = useMemo(() => createReadPort(), []);
   const [orders, setOrders] = useState<Order[]>([]);
   const [productsById, setProductsById] = useState<Record<string, Product>>({});
 
   useEffect(() => {
     async function load() {
-      const controller = createReadController();
-      const nextOrders = await controller.listOrdersByInvestor(user.uid);
+      const nextOrders = await readController.listOrdersByInvestor(user.uid);
       const productEntries = await Promise.all(
         Array.from(new Set(nextOrders.map((order) => order.productId))).map(
-          async (productId) => [productId, await controller.getProductById(productId)] as const,
+          async (productId) => [productId, await readController.getProductById(productId)] as const,
         ),
       );
 
@@ -31,7 +31,7 @@ export default function InvestorOrdersPage() {
     }
 
     void load();
-  }, [user.uid]);
+  }, [readController, user.uid]);
 
   if (loading) {
     return null;

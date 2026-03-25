@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getPublicListingDetails } from "@/src/application/use-cases/publicContent";
-import { createPublicContentReader } from "@/src/infrastructure/repositories/createPublicContentReader";
+import { createPublicContentReader } from "@/src/presentation/composition/server";
 import { InvestorListing } from "./InvestorListing";
 
 export default async function InvestorListingPage({ params }: { params: { listingId: string } }) {

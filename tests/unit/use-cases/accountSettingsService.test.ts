@@ -8,8 +8,10 @@ function makeAuthClient(): AuthClient {
   return {
     onAuthStateChanged: vi.fn(),
     getAccessToken: vi.fn(),
+    getCurrentGroups: vi.fn().mockResolvedValue([]),
     signInWithEmailAndPassword: vi.fn(),
     createUserWithEmailAndPassword: vi.fn(),
+    signInWithGoogle: vi.fn(),
     confirmUserSignUp: vi.fn(),
     resendConfirmationCode: vi.fn(),
     requestPasswordReset: vi.fn(),

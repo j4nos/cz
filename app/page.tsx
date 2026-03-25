@@ -1,82 +1,9 @@
-import { generateClient } from "aws-amplify/data";
-
-import type { Schema } from "@/amplify/data/resource";
 import { Hero } from "@/components/sections/Hero";
 import { PhotoCta } from "@/components/sections/PhotoCta";
-import { ensureAmplifyConfigured } from "@/src/config/amplify";
-import { toPublicStorageUrl } from "@/src/infrastructure/storage/publicUrls";
-
-type CtaContent = {
-  href: string;
-  title: string;
-  text: string;
-  image?: string;
-  reverse?: boolean;
-};
+import { getHomepageCtas } from "@/src/presentation/composition/server";
 
 export default async function Home() {
-  ensureAmplifyConfigured();
-  const client = generateClient<Schema>();
-  const { data: settings } = await client.models.PlatformSettings.get(
-    { id: "homepage" },
-    { authMode: "apiKey" },
-  );
-
-  const firstListingId = settings?.homepageFirstListingId;
-  const secondListingId = settings?.homepageSecondListingId;
-  const firstAssetId = settings?.homepageFirstAssetId;
-  const secondAssetId = settings?.homepageSecondAssetId;
-
-  let ctaOne: CtaContent | null = null;
-  let ctaTwo: CtaContent | null = null;
-
-  if (
-    !firstListingId ||
-    !secondListingId ||
-    !firstAssetId ||
-    !secondAssetId
-  ) {
-  } else {
-    const [firstListingResponse, secondListingResponse, firstAssetResponse, secondAssetResponse] =
-      await Promise.all([
-        client.models.Listing.get({ id: firstListingId }, { authMode: "apiKey" }),
-        client.models.Listing.get({ id: secondListingId }, { authMode: "apiKey" }),
-        client.models.Asset.get({ id: firstAssetId }, { authMode: "apiKey" }),
-        client.models.Asset.get({ id: secondAssetId }, { authMode: "apiKey" }),
-      ]);
-    const firstListing = firstListingResponse.data;
-    const secondListing = secondListingResponse.data;
-    const firstAsset = firstAssetResponse.data;
-    const secondAsset = secondAssetResponse.data;
-
-    const toCta = (
-      listingId: string,
-      listing: Schema["Listing"]["type"] | null | undefined,
-      fallbackText: string,
-      image?: string,
-    ): CtaContent => ({
-      href: `/listings/${listingId}`,
-      title: listing?.title ?? listingId,
-      text: listing?.description || fallbackText,
-      image,
-    });
-
-    ctaOne = toCta(
-      firstListingId,
-      firstListing,
-      "Featured listing",
-      firstAsset?.imageUrls?.[0] ? toPublicStorageUrl(firstAsset.imageUrls[0]) : undefined,
-    );
-    ctaTwo = {
-      ...toCta(
-        secondListingId,
-        secondListing,
-        "Featured listing",
-        secondAsset?.imageUrls?.[0] ? toPublicStorageUrl(secondAsset.imageUrls[0]) : undefined,
-      ),
-      reverse: true,
-    };
-  }
+  const { ctaOne, ctaTwo } = await getHomepageCtas();
 
   return (
     <div className="vertical-stack-with-gap">

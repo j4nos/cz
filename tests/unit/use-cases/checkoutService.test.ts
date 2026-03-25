@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthClient } from "@/src/application/interfaces/authClient";
-import type { OrderPort } from "@/src/application/interfaces/orderPort";
-import type { ReadPort } from "@/src/application/interfaces/readPort";
 import {
   getCheckoutPaymentOptions,
   getCheckoutSubmissionError,
@@ -10,25 +8,17 @@ import {
 import { CheckoutService } from "@/src/application/use-cases/checkoutService";
 import { makeAsset, makeListing, makeOrder, makeProduct } from "@/tests/helpers/factories";
 
-function makeReadPort(): ReadPort {
+function makeReadRepository() {
   return {
-    listAssets: vi.fn(),
     getAssetById: vi.fn().mockResolvedValue(makeAsset()),
     getListingById: vi.fn().mockResolvedValue(makeListing()),
-    getOrderById: vi.fn(),
-    listListingsByAssetId: vi.fn(),
     listProductsByListingId: vi.fn().mockResolvedValue([makeProduct()]),
-    getProductById: vi.fn(),
-    listOrdersByInvestor: vi.fn(),
-    listOrdersByProvider: vi.fn(),
   };
 }
 
-function makeOrderPort(): OrderPort {
+function makeOrderService() {
   return {
-    placeOrder: vi.fn().mockResolvedValue(makeOrder()),
-    completeOrder: vi.fn(),
-    markOrderWithdrawn: vi.fn(),
+    startOrder: vi.fn().mockResolvedValue(makeOrder()),
   };
 }
 
@@ -36,8 +26,10 @@ function makeAuthClient(): AuthClient {
   return {
     onAuthStateChanged: vi.fn(),
     getAccessToken: vi.fn(),
+    getCurrentGroups: vi.fn().mockResolvedValue([]),
     signInWithEmailAndPassword: vi.fn(),
     createUserWithEmailAndPassword: vi.fn(),
+    signInWithGoogle: vi.fn(),
     confirmUserSignUp: vi.fn(),
     resendConfirmationCode: vi.fn(),
     requestPasswordReset: vi.fn(),
@@ -112,7 +104,7 @@ describe("checkoutRules", () => {
 
 describe("CheckoutService", () => {
   it("returns an error result with redirectToLogin when the user is unauthenticated", async () => {
-    const service = new CheckoutService(makeReadPort(), makeOrderPort(), makeAuthClient(), vi.fn());
+    const service = new CheckoutService(makeReadRepository(), makeOrderService(), makeAuthClient(), vi.fn());
 
     const result = await service.submitCheckout({
       listing: makeListing(),
@@ -132,9 +124,9 @@ describe("CheckoutService", () => {
   });
 
   it("returns a redirect result when bank transfer payment starts successfully", async () => {
-    const orderPort = makeOrderPort();
+    const orderService = makeOrderService();
     const createBankTransferPayment = vi.fn().mockResolvedValue({ redirectUrl: "https://powens.test/redirect" });
-    const service = new CheckoutService(makeReadPort(), orderPort, makeAuthClient(), createBankTransferPayment);
+    const service = new CheckoutService(makeReadRepository(), orderService, makeAuthClient(), createBankTransferPayment);
 
     const result = await service.submitCheckout({
       listing: makeListing(),
@@ -149,7 +141,7 @@ describe("CheckoutService", () => {
       accessToken: "token",
     });
 
-    expect(orderPort.placeOrder).toHaveBeenCalledWith(
+    expect(orderService.startOrder).toHaveBeenCalledWith(
       expect.objectContaining({
         coupon: "SPRING24",
         notes: "Investor note",
@@ -161,8 +153,8 @@ describe("CheckoutService", () => {
 
   it("returns a user-facing error when bank transfer start does not return a redirect url", async () => {
     const service = new CheckoutService(
-      makeReadPort(),
-      makeOrderPort(),
+      makeReadRepository(),
+      makeOrderService(),
       makeAuthClient(),
       vi.fn().mockResolvedValue({ error: "Powens unavailable" }),
     );
@@ -183,7 +175,7 @@ describe("CheckoutService", () => {
 
   it("returns success for card payments without starting bank transfer", async () => {
     const createBankTransferPayment = vi.fn();
-    const service = new CheckoutService(makeReadPort(), makeOrderPort(), makeAuthClient(), createBankTransferPayment);
+    const service = new CheckoutService(makeReadRepository(), makeOrderService(), makeAuthClient(), createBankTransferPayment);
 
     const result = await service.submitCheckout({
       listing: makeListing(),
@@ -200,8 +192,8 @@ describe("CheckoutService", () => {
   });
 
   it("passes coupon and notes into order placement", async () => {
-    const orderPort = makeOrderPort();
-    const service = new CheckoutService(makeReadPort(), orderPort, makeAuthClient(), vi.fn());
+    const orderService = makeOrderService();
+    const service = new CheckoutService(makeReadRepository(), orderService, makeAuthClient(), vi.fn());
 
     await service.submitCheckout({
       listing: makeListing(),
@@ -215,7 +207,7 @@ describe("CheckoutService", () => {
       authLoading: false,
     });
 
-    expect(orderPort.placeOrder).toHaveBeenCalledWith(
+    expect(orderService.startOrder).toHaveBeenCalledWith(
       expect.objectContaining({
         coupon: "VIP50",
         notes: "Save this on the order",

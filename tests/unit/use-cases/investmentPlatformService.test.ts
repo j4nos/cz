@@ -5,7 +5,7 @@ import type { InvestmentRepository } from "@/src/domain/repositories/investmentR
 import { makeAsset, makeListing, makeOrder, makeProduct, makeUserProfile } from "@/tests/helpers/factories";
 
 class FakeRepository implements InvestmentRepository {
-  user = makeUserProfile({ id: "investor-1", investorType: "PRO" });
+  user = makeUserProfile({ id: "investor-1", investorType: "PROFESSIONAL" });
   asset = makeAsset();
   listing = makeListing();
   product = makeProduct();
@@ -18,20 +18,27 @@ class FakeRepository implements InvestmentRepository {
   async createUserProfile(input: ReturnType<typeof makeUserProfile>) { return input; }
   async getUserProfileById() { return this.user; }
   async updateUserProfile(input: ReturnType<typeof makeUserProfile>) { return input; }
+  async deleteUserProfile() {}
   async createAsset(input: ReturnType<typeof makeAsset>) { return input; }
   async getAssetById() { return this.asset; }
   async updateAsset(input: ReturnType<typeof makeAsset>) { return input; }
   async deleteAsset() {}
+  async listAssets() { return [this.asset]; }
   async createListing(input: ReturnType<typeof makeListing>) { return input; }
   async getListingById() { return this.listing; }
+  async updateListing(input: ReturnType<typeof makeListing>) { return input; }
   async deleteListing() {}
+  async listListings() { return [this.listing]; }
   async createProduct(input: ReturnType<typeof makeProduct>) { this.createdProduct = input; return input; }
   async getProductById() { return this.product; }
   async updateProduct(input: ReturnType<typeof makeProduct>) { this.updatedProduct = input; return input; }
   async deleteProduct() {}
+  async listProductsByListingId() { return [this.product]; }
   async createOrder(input: ReturnType<typeof makeOrder>) { this.createdOrder = input; return input; }
   async getOrderById() { return this.order; }
   async findOrderByPaymentProviderId() { return null; }
+  async listOrdersByInvestor() { return [this.order]; }
+  async listOrdersByProvider() { return [this.order]; }
   async getMintRequestById() { return null; }
   async createMintRequestIfMissing() { return { request: null, created: false as const }; }
   async updateMintRequest(input: never) { return input; }
@@ -126,7 +133,7 @@ describe("InvestmentPlatformService", () => {
   it("rejects ineligible investors", async () => {
     const repository = new FakeRepository();
     repository.user = makeUserProfile({ id: "investor-1", investorType: "RETAIL" });
-    repository.product = makeProduct({ eligibleInvestorType: "PRO" });
+    repository.product = makeProduct({ eligibleInvestorType: "PROFESSIONAL" });
     const service = new InvestmentPlatformService(repository, new FixedIdGenerator(), new FixedClock());
 
     await expect(service.startOrder({ investorId: "investor-1", listingId: "listing-1", productId: "product-1", quantity: 2 })).rejects.toMatchObject({
@@ -136,9 +143,9 @@ describe("InvestmentPlatformService", () => {
 
   it("creates pending orders for valid inputs", async () => {
     const repository = new FakeRepository();
-    repository.user = makeUserProfile({ id: "investor-1", investorType: "PRO" });
+    repository.user = makeUserProfile({ id: "investor-1", investorType: "PROFESSIONAL" });
     repository.product = makeProduct({
-      eligibleInvestorType: "PRO",
+      eligibleInvestorType: "PROFESSIONAL",
       unitPrice: 250,
       coupons: [{ code: "VIP50", discountedUnitPrice: 200 }],
     });

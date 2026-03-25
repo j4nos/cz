@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { PlainCta } from "@/components/sections/PlainCta";
@@ -21,13 +21,13 @@ import {
   getPricingTierInputError,
   removePricingTierFromState,
 } from "@/src/application/use-cases/pricingRules";
-import { normalizeCouponCode } from "@/src/application/use-cases/productCoupons";
+import { normalizeCouponCode } from "@/src/domain/policies/productCouponPolicy";
 import {
   type PricingTier,
   type ProductPricingState,
 } from "@/src/application/dto/pricingState";
 import type { EligibleInvestorType } from "@/src/domain/entities";
-import { createPricingController } from "@/src/infrastructure/controllers/createPricingController";
+import { createProductPricingFacade } from "@/src/presentation/composition/client";
 
 type Props = {
   assetId: string;
@@ -50,6 +50,7 @@ export function PricingEditor({
     ? `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${preselectedProductId}`
     : "";
   const { setToast } = useToast();
+  const productPricingService = useMemo(() => createProductPricingFacade(), []);
   const [state, setState] = useState<ProductPricingState | null>(null);
   const [minQuantity, setMinQuantity] = useState("1");
   const [discountPercent, setDiscountPercent] = useState("0");
@@ -59,8 +60,7 @@ export function PricingEditor({
 
   useEffect(() => {
     async function load() {
-      const controller = createPricingController();
-      const nextState = await controller.loadPricingState(
+      const nextState = await productPricingService.loadPricingState(
         listingId,
         preselectedProductId
       );
@@ -68,7 +68,7 @@ export function PricingEditor({
     }
 
     void load();
-  }, [listingId, mode, preselectedProductId]);
+  }, [listingId, mode, preselectedProductId, productPricingService]);
 
   function updateField<Key extends keyof ProductPricingState>(
     key: Key,
@@ -78,16 +78,12 @@ export function PricingEditor({
   }
 
   async function persistState(nextState: ProductPricingState) {
-    const saved = await createPricingController().savePricingState(nextState);
-    setState(saved);
-    await fetch("/api/asset-provider/revalidate-listings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify({ listingId }),
+    const saved = await productPricingService.savePricingState({
+      state: nextState,
+      listingId,
+      accessToken,
     });
+    setState(saved);
     if (saved.productId) {
       const nextProductPath = `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${saved.productId}`;
       if (nextProductPath !== currentProductPath) {
@@ -250,15 +246,7 @@ export function PricingEditor({
 
     try {
       setError("");
-      await createPricingController().deleteProduct(state.productId);
-      await fetch("/api/asset-provider/revalidate-listings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({ listingId }),
-      });
+      await productPricingService.deleteProduct(state.productId);
       router.push(
         redirectAfterDelete ??
           `/asset-provider/assets/${assetId}/listings/${listingId}/edit`

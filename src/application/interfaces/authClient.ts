@@ -13,6 +13,7 @@ export type RegisterResult = {
 export type AuthClient = {
   onAuthStateChanged: (handler: (user: AuthUser | null) => void) => () => void;
   getAccessToken: () => Promise<string | null>;
+  getCurrentGroups: () => Promise<string[]>;
   signInWithEmailAndPassword: (email: string, password: string) => Promise<AuthUser>;
   signInWithGoogle: () => Promise<void>;
   createUserWithEmailAndPassword: (email: string, password: string) => Promise<RegisterResult>;

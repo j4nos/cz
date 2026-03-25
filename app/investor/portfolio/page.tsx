@@ -6,40 +6,18 @@ import { unstable_batchedUpdates } from "react-dom";
 import { WithdrawPopup } from "@/components/WithdrawPopup";
 import { Button } from "@/components/ui/Button";
 import { Table } from "@/components/ui/Table";
-import { OwnershipMintingService } from "@/src/application/use-cases/ownershipMintingService";
 import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useLoading } from "@/contexts/LoadingContext";
 import { useToast } from "@/contexts/ToastContext";
 import type { Order } from "@/src/domain/entities";
-import { createReadController } from "@/src/infrastructure/controllers/createReadController";
+import { createOwnershipMintingService, createReadPort } from "@/src/presentation/composition/client";
 
 export default function InvestorPortfolioPage() {
   const { user, accessToken, loading } = usePrivateAuth();
   const { setToast } = useToast();
   const { setLoading } = useLoading();
-  const readController = useMemo(() => createReadController(), []);
-  const ownershipMintingService = useMemo(
-    () =>
-      new OwnershipMintingService(
-        readController,
-        async ({ accessToken: currentAccessToken, body }) => {
-          const response = await fetch("/api/mint-ownership", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${currentAccessToken}`,
-            },
-            body: JSON.stringify(body),
-          });
-          const result = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw new Error(result?.error || "Mint API error");
-          }
-          return result;
-        },
-      ),
-    [readController],
-  );
+  const readController = useMemo(() => createReadPort(), []);
+  const ownershipMintingService = useMemo(() => createOwnershipMintingService(), []);
   const [orders, setOrders] = useState<Order[]>([]);
   const [tokenHoldings, setTokenHoldings] = useState<
     Array<{

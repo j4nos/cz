@@ -1,18 +1,5 @@
 import type { Order } from "@/src/domain/entities";
 import type { InvestmentRepository } from "@/src/domain/repositories/investmentRepository";
-import { InvestmentPlatformService } from "@/src/application/use-cases/investmentPlatformService";
-
-class NoopIdGenerator {
-  next(): string {
-    return "";
-  }
-}
-
-class SystemClock {
-  now(): string {
-    return new Date().toISOString();
-  }
-}
 
 const normalizeState = (state?: string) => (state || "").toLowerCase();
 
@@ -35,15 +22,10 @@ export const mapPowensPaymentStateToOrderStatus = (state?: string) => {
 };
 
 export class PowensPaymentSyncService {
-  private readonly investmentPlatformService: InvestmentPlatformService;
-
-  constructor(private readonly repository: InvestmentRepository) {
-    this.investmentPlatformService = new InvestmentPlatformService(
-      repository,
-      new NoopIdGenerator(),
-      new SystemClock(),
-    );
-  }
+  constructor(
+    private readonly repository: InvestmentRepository,
+    private readonly completeOrderPayment: (input: { orderId: string }) => Promise<Order>,
+  ) {}
 
   async syncByPaymentProviderId(input: {
     paymentProviderId: string;
@@ -73,7 +55,7 @@ export class PowensPaymentSyncService {
     const nextStatus = mapPowensPaymentStateToOrderStatus(paymentState);
 
     if (nextStatus === "paid" && order.status === "pending") {
-      const paidOrder = await this.investmentPlatformService.completeOrderPayment({
+      const paidOrder = await this.completeOrderPayment({
         orderId: order.id,
       });
       return this.repository.updateOrder({

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { KeyValueList } from "@/components/ui/KeyValueList";
 import { useAuth } from "@/contexts/AuthContext";
 import type { PublicListingWithAsset } from "@/src/application/use-cases/publicContent";
 import type { Order } from "@/src/domain/entities";
-import { createReadController } from "@/src/infrastructure/controllers/createReadController";
+import { createReadPort } from "@/src/presentation/composition/client";
 
 type Props = {
   orderId: string;
@@ -22,6 +22,7 @@ export function InvestorOrder({
   initialProductName,
 }: Props) {
   const { activeUser } = useAuth();
+  const readController = useMemo(() => createReadPort(), []);
   const [order, setOrder] = useState<Order | null | undefined>(
     initialOrder === undefined ? undefined : initialOrder
   );
@@ -38,16 +39,15 @@ export function InvestorOrder({
     }
 
     async function load() {
-      const controller = createReadController();
       const orders = activeUser
-        ? await controller.listOrdersByInvestor(activeUser.uid)
+        ? await readController.listOrdersByInvestor(activeUser.uid)
         : [];
       const next = orders.find((item) => item.id === orderId) ?? null;
       setOrder(next);
     }
 
     void load();
-  }, [activeUser, initialOrder, orderId]);
+  }, [activeUser, initialOrder, orderId, readController]);
 
   useEffect(() => {
     async function loadRelated() {
@@ -55,19 +55,18 @@ export function InvestorOrder({
         return;
       }
 
-      const controller = createReadController();
       if (!fallbackListingTitle) {
-        const listing = await controller.getListingById(order.listingId);
+        const listing = await readController.getListingById(order.listingId);
         setFallbackListingTitle(listing?.title ?? null);
       }
       if (!fallbackProductName) {
-        const product = await controller.getProductById(order.productId);
+        const product = await readController.getProductById(order.productId);
         setFallbackProductName(product?.name ?? null);
       }
     }
 
     void loadRelated();
-  }, [fallbackListingTitle, fallbackProductName, order]);
+  }, [fallbackListingTitle, fallbackProductName, order, readController]);
   if (order === undefined) {
     return null;
   }

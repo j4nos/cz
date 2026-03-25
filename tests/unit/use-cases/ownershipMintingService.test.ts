@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ReadPort } from "@/src/application/interfaces/readPort";
 import { OwnershipMintingService } from "@/src/application/use-cases/ownershipMintingService";
 import {
   buildMintOwnershipRequest,
@@ -9,17 +8,10 @@ import {
 } from "@/src/application/use-cases/ownershipMinting";
 import { makeAsset, makeListing, makeOrder } from "@/tests/helpers/factories";
 
-function makeReadPort(input?: { listing?: ReturnType<typeof makeListing> | null; asset?: ReturnType<typeof makeAsset> | null }): ReadPort {
+function makeReadRepository(input?: { listing?: ReturnType<typeof makeListing> | null; asset?: ReturnType<typeof makeAsset> | null }) {
   return {
-    listAssets: vi.fn(),
     getAssetById: vi.fn().mockResolvedValue(input && "asset" in input ? input.asset : makeAsset({ tokenAddress: "0xtoken" })),
     getListingById: vi.fn().mockResolvedValue(input && "listing" in input ? input.listing : makeListing()),
-    getOrderById: vi.fn(),
-    listListingsByAssetId: vi.fn(),
-    listProductsByListingId: vi.fn(),
-    getProductById: vi.fn(),
-    listOrdersByInvestor: vi.fn(),
-    listOrdersByProvider: vi.fn(),
   };
 }
 
@@ -81,7 +73,7 @@ describe("ownershipMinting helpers", () => {
 
 describe("OwnershipMintingService", () => {
   it("returns an error when the order is missing", async () => {
-    const service = new OwnershipMintingService(makeReadPort(), vi.fn());
+    const service = new OwnershipMintingService(makeReadRepository(), vi.fn());
 
     await expect(service.mint({ order: null, accessToken: "token" })).resolves.toEqual({
       kind: "error",
@@ -90,7 +82,7 @@ describe("OwnershipMintingService", () => {
   });
 
   it("returns an error when the listing cannot be resolved", async () => {
-    const service = new OwnershipMintingService(makeReadPort({ listing: null }), vi.fn());
+    const service = new OwnershipMintingService(makeReadRepository({ listing: null }), vi.fn());
 
     const result = await service.mint({ order: makeOrder(), accessToken: "token" });
 
@@ -99,7 +91,7 @@ describe("OwnershipMintingService", () => {
 
   it("returns an error when the token address is missing", async () => {
     const service = new OwnershipMintingService(
-      makeReadPort({ asset: makeAsset({ tokenAddress: undefined }) }),
+      makeReadRepository({ asset: makeAsset({ tokenAddress: undefined }) }),
       vi.fn(),
     );
 
@@ -109,7 +101,7 @@ describe("OwnershipMintingService", () => {
   });
 
   it("returns an error when both wallet addresses are missing", async () => {
-    const service = new OwnershipMintingService(makeReadPort(), vi.fn());
+    const service = new OwnershipMintingService(makeReadRepository(), vi.fn());
 
     const result = await service.mint({ order: makeOrder({ investorWalletAddress: undefined }), accessToken: "token" });
 
@@ -118,7 +110,7 @@ describe("OwnershipMintingService", () => {
 
   it("returns a warning toast when the mint request stays pending", async () => {
     const requestMint = vi.fn().mockResolvedValue({ status: "queued" });
-    const service = new OwnershipMintingService(makeReadPort(), requestMint);
+    const service = new OwnershipMintingService(makeReadRepository(), requestMint);
 
     const result = await service.mint({
       order: makeOrder({ investorWalletAddress: "0xwallet" }),
@@ -134,7 +126,7 @@ describe("OwnershipMintingService", () => {
 
   it("returns a success result with tx hash details when minting is initiated", async () => {
     const requestMint = vi.fn().mockResolvedValue({ status: "minted", txHash: "0xtxhash" });
-    const service = new OwnershipMintingService(makeReadPort(), requestMint);
+    const service = new OwnershipMintingService(makeReadRepository(), requestMint);
 
     const result = await service.mint({
       order: makeOrder({ investorWalletAddress: "0xwallet" }),

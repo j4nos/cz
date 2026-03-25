@@ -41,4 +41,8 @@ export class AmplifyUserProfileRepository {
 
     return response.data ? mapUserProfileRecord(response.data) : input;
   }
+
+  async deleteUserProfile(id: string): Promise<void> {
+    await this.client.models.UserProfile.delete({ id });
+  }
 }

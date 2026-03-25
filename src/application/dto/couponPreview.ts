@@ -3,6 +3,7 @@ export type CouponPreview = {
   effectiveUnitPrice: number;
   total: number;
   couponCodeApplied?: string;
+  discountPctApplied?: number;
   isCouponValid: boolean;
   hasCouponInput: boolean;
   message?: string;

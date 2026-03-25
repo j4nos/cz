@@ -1,52 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { KeyValueList } from "@/components/ui/KeyValueList";
 import { useAssetWizard } from "@/contexts/asset-wizard-context";
-import { usePrivateAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import type { Asset } from "@/src/domain/entities";
-import { createInvestmentRepository } from "@/src/infrastructure/composition/defaults";
+import { createAuthClient } from "@/src/presentation/composition/client";
 
 export function Step4PageContent({ assetId }: { assetId: string }) {
   const router = useRouter();
-  const { accessToken } = usePrivateAuth();
   const { setToast } = useToast();
-  const { state, updateState, resetState } = useAssetWizard();
-  const [asset, setAsset] = useState<Asset | null>(null);
+  const { state, resetState } = useAssetWizard();
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      const loadedAsset = await createInvestmentRepository().getAssetById(assetId);
-      setAsset(loadedAsset);
-
-      if (loadedAsset) {
-        updateState({
-          assetId: loadedAsset.id,
-          name: loadedAsset.name,
-          country: loadedAsset.country,
-          assetClass: loadedAsset.assetClass,
-          tokenStandard:
-            loadedAsset.tokenStandard === "ERC-20" ||
-            loadedAsset.tokenStandard === "ERC-721"
-              ? loadedAsset.tokenStandard
-              : state.tokenStandard ?? "ERC-20",
-        });
-      }
-    }
-
-    void load();
-  }, [assetId, state.tokenStandard, updateState]);
-
   async function submitAsset() {
-    const nameValue = asset?.name || state.name;
-    const countryValue = asset?.country || state.country;
-    const assetClassValue = asset?.assetClass || state.assetClass;
-    const desiredStandard = state.tokenStandard || asset?.tokenStandard || "ERC-20";
+    const nameValue = state.name;
+    const countryValue = state.country;
+    const assetClassValue = state.assetClass;
+    const desiredStandard = state.tokenStandard || "ERC-20";
 
     if (!nameValue || !countryValue || !assetClassValue) {
       setToast("Missing asset details. Complete previous steps.", "warning", 2000);
@@ -56,6 +30,7 @@ export function Step4PageContent({ assetId }: { assetId: string }) {
     setSubmitting(true);
 
     try {
+      const accessToken = await createAuthClient().getAccessToken();
       if (!accessToken) {
         setToast("Login required to submit assets.", "danger", 2500);
         setSubmitting(false);
@@ -88,8 +63,6 @@ export function Step4PageContent({ assetId }: { assetId: string }) {
       if (!savedAsset) {
         throw new Error("Asset submission returned no asset.");
       }
-
-      setAsset(savedAsset);
       resetState();
       setToast("Asset submitted with token.", "success", 2500);
       router.push(`/asset-provider/assets/${savedAsset.id}`);
@@ -102,12 +75,12 @@ export function Step4PageContent({ assetId }: { assetId: string }) {
     }
   }
 
-  const displayName = asset?.name || state.name;
-  const displayCountry = asset?.country || state.country;
-  const displayAssetClass = asset?.assetClass || state.assetClass;
+  const displayName = state.name;
+  const displayCountry = state.country;
+  const displayAssetClass = state.assetClass;
   const displayTokenName = displayName;
-  const displayTokenStandard = state.tokenStandard || asset?.tokenStandard || "ERC-20";
-  const displayStatus = asset?.status || "draft";
+  const displayTokenStandard = state.tokenStandard || "ERC-20";
+  const displayStatus = "draft";
   const reviewItems = [
     {
       label: "Name",

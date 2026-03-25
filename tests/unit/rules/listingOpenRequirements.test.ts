@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { getListingOpenRequirementError } from "@/src/application/use-cases/listingOpenRequirements";
+import { getListingOpenRequirementError } from "@/src/domain/policies/listingOpenPolicy";
 import { makeAsset, makeListing, makeProduct } from "@/tests/helpers/factories";
 
 describe("listingOpenRequirements", () => {

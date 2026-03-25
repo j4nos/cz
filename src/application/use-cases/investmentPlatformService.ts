@@ -8,7 +8,7 @@ import type {
   Product,
   UserProfile,
 } from "@/src/domain/entities";
-import { getCouponPricing, normalizeCouponCode } from "@/src/application/use-cases/productCoupons";
+import { getCouponPricing, normalizeCouponCode } from "@/src/domain/policies/productCouponPolicy";
 import { DomainError } from "@/src/domain/value-objects/errors";
 
 export interface IdGenerator {
@@ -79,6 +79,7 @@ export class InvestmentPlatformService {
     fromPrice: number;
     startsAt?: string;
     endsAt?: string;
+    saleStatus?: Listing["saleStatus"];
   }): Promise<Listing> {
     const asset = await this.requireAsset(input.assetId);
     await this.requireUser(asset.tenantUserId);
@@ -92,7 +93,7 @@ export class InvestmentPlatformService {
       eligibility: input.eligibility,
       currency: input.currency,
       fromPrice: input.fromPrice,
-      saleStatus: "open",
+      saleStatus: input.saleStatus ?? "open",
       startsAt: input.startsAt,
       endsAt: input.endsAt,
     });

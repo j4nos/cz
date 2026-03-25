@@ -9,8 +9,14 @@ import {
 } from "@/src/application/use-cases/checkoutRules";
 import type { AuthClient } from "@/src/application/interfaces/authClient";
 import type { Asset, Listing, Product } from "@/src/domain/entities";
-import type { ReadPort } from "@/src/application/interfaces/readPort";
 import type { InvestmentPlatformService } from "@/src/application/use-cases/investmentPlatformService";
+import { stripProductCoupons } from "@/src/domain/policies/productCouponPolicy";
+
+type CheckoutReadRepository = {
+  getAssetById: (assetId: string) => Promise<Asset | null>;
+  getListingById: (listingId: string) => Promise<Listing | null>;
+  listProductsByListingId: (listingId: string) => Promise<Product[]>;
+};
 
 type LoadCheckoutInput = {
   listingId: string;
@@ -38,7 +44,7 @@ type CreatePaymentResult = {
 
 export class CheckoutService {
   constructor(
-    private readonly readController: ReadPort,
+    private readonly repository: CheckoutReadRepository,
     private readonly orderService: Pick<InvestmentPlatformService, "startOrder">,
     private readonly authClient: AuthClient,
     private readonly createBankTransferPayment: (input: {
@@ -57,11 +63,11 @@ export class CheckoutService {
     paymentType: CheckoutPaymentType;
     paymentOptions: CheckoutPaymentOption[];
   }> {
-    const listing = await this.readController.getListingById(input.listingId);
+    const listing = await this.repository.getListingById(input.listingId);
     const asset = listing?.assetId
-      ? await this.readController.getAssetById(listing.assetId)
+      ? await this.repository.getAssetById(listing.assetId)
       : null;
-    const products = await this.readController.listProductsByListingId(input.listingId);
+    const products = (await this.repository.listProductsByListingId(input.listingId)).map(stripProductCoupons);
     const selectedProduct = getSelectedCheckoutProduct(products, input.requestedProductId);
     const providerProfile = asset?.tenantUserId
       ? await this.authClient.getUserProfile(asset.tenantUserId).catch(() => null)

@@ -10,7 +10,7 @@ import type {
   ProductCoupon,
   UserProfile,
 } from "@/src/domain/entities";
-import { sanitizeProductCoupons } from "@/src/application/use-cases/productCoupons";
+import { sanitizeProductCoupons } from "@/src/domain/policies/productCouponPolicy";
 import { toPublicStorageUrl, toPublicStorageUrls } from "@/src/infrastructure/storage/publicUrls";
 
 function normalizeAssetStatus(value?: string): Asset["status"] {
