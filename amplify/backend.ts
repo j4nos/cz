@@ -72,6 +72,7 @@ backend.storage.resources.cfnResources.cfnBucket.corsConfiguration = {
 
 backend.addOutput({
   custom: {
+    dataApiId: backend.data.resources.cfnResources.cfnGraphqlApi.attrApiId,
     storageCdnUrl: `https://${storageCdn.domainName}`,
   },
 });
