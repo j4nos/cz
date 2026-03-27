@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -55,23 +55,75 @@ type ChatPanelProps = {
   userId?: string;
 };
 
+type ChatPanelState = {
+  draft: string;
+  threadId: string;
+  messages: Message[];
+  threads: ThreadSummary[];
+  isLoading: boolean;
+};
+
+type ChatPanelAction =
+  | { type: "set_draft"; payload: string }
+  | { type: "set_thread_id"; payload: string }
+  | { type: "replace_threads"; payload: ThreadSummary[] }
+  | { type: "replace_messages"; payload: Message[] }
+  | { type: "merge_messages"; payload: Message[] }
+  | { type: "upsert_thread"; payload: ThreadSummary }
+  | { type: "set_loading"; payload: boolean }
+  | { type: "start_new_thread"; payload: string }
+  | { type: "clear_threads" }
+  | { type: "clear_messages" };
+
+function createInitialChatPanelState(): ChatPanelState {
+  return {
+    draft: "",
+    threadId: typeof crypto !== "undefined" ? crypto.randomUUID() : "local-thread",
+    messages: [],
+    threads: [],
+    isLoading: false,
+  };
+}
+
+function chatPanelReducer(state: ChatPanelState, action: ChatPanelAction): ChatPanelState {
+  switch (action.type) {
+    case "set_draft":
+      return { ...state, draft: action.payload };
+    case "set_thread_id":
+      return { ...state, threadId: action.payload };
+    case "replace_threads":
+      return { ...state, threads: action.payload };
+    case "replace_messages":
+      return { ...state, messages: action.payload };
+    case "merge_messages":
+      return { ...state, messages: mergeMessages(state.messages, action.payload) };
+    case "upsert_thread":
+      return { ...state, threads: upsertThread(state.threads, action.payload) };
+    case "set_loading":
+      return { ...state, isLoading: action.payload };
+    case "start_new_thread":
+      return { ...state, threadId: action.payload, messages: [] };
+    case "clear_threads":
+      return { ...state, threads: [] };
+    case "clear_messages":
+      return { ...state, messages: [] };
+    default:
+      return state;
+  }
+}
+
 export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
   const router = useRouter();
   const { activeUser, accessToken, getAccessToken } = useAuth();
   const { setToast } = useToast();
   const chatPanelService = useMemo(() => createChatPanelService(), []);
   const resolvedUserId = activeUser?.uid ?? userId ?? "";
-  const [draft, setDraft] = useState("");
-  const [threadId, setThreadId] = useState(() =>
-    typeof crypto !== "undefined" ? crypto.randomUUID() : "local-thread",
-  );
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [threads, setThreads] = useState<ThreadSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [state, dispatch] = useReducer(chatPanelReducer, undefined, createInitialChatPanelState);
+  const { draft, threadId, messages, threads, isLoading } = state;
 
   useEffect(() => {
     if (!resolvedUserId) {
-      setThreads([]);
+      dispatch({ type: "clear_threads" });
       return;
     }
 
@@ -80,15 +132,16 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     async function loadThreads() {
       const items = await chatPanelService.listThreads(resolvedUserId);
       if (!controller.signal.aborted) {
-        setThreads(
-          items
+        dispatch({
+          type: "replace_threads",
+          payload: items
             .map((item) => ({
               threadId: item.threadId,
               lastMessageAt: item.lastMessageAt,
               lastMessageText: item.lastMessageText,
             }))
             .sort((left, right) => right.lastMessageAt.localeCompare(left.lastMessageAt)),
-        );
+        });
       }
     }
 
@@ -112,19 +165,20 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     }
 
     return chatPanelService.subscribeToThreads(resolvedUserId, (thread) => {
-      setThreads((current) =>
-        upsertThread(current, {
+      dispatch({
+        type: "upsert_thread",
+        payload: {
           threadId: thread.threadId,
           lastMessageAt: thread.lastMessageAt,
           lastMessageText: thread.lastMessageText,
-        }),
-      );
+        },
+      });
     });
   }, [chatPanelService, resolvedUserId]);
 
   useEffect(() => {
     if (!resolvedUserId) {
-      setMessages([]);
+      dispatch({ type: "clear_messages" });
       return;
     }
 
@@ -133,8 +187,9 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     async function loadHistory() {
       const items = await chatPanelService.listMessages(resolvedUserId, threadId);
       if (!controller.signal.aborted) {
-        setMessages(
-          items
+        dispatch({
+          type: "replace_messages",
+          payload: items
             .map((item) => ({
               id: item.id,
               role: item.role,
@@ -142,7 +197,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
               createdAt: item.createdAt ?? undefined,
             }))
             .sort((left, right) => (left.createdAt ?? "").localeCompare(right.createdAt ?? "")),
-        );
+        });
       }
     }
 
@@ -152,7 +207,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
         !controller.signal.aborted
       ) {
         setToast("Could not load this thread.", "danger", 2500);
-        setMessages([]);
+        dispatch({ type: "clear_messages" });
       }
     });
 
@@ -167,16 +222,17 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
     }
 
     return chatPanelService.subscribeToMessages(resolvedUserId, threadId, (message) => {
-      setMessages((current) =>
-        mergeMessages(current, [
+      dispatch({
+        type: "merge_messages",
+        payload: [
           {
             id: message.id,
             role: message.role,
             text: message.text,
             createdAt: message.createdAt ?? undefined,
           },
-        ]),
-      );
+        ],
+      });
     });
   }, [chatPanelService, resolvedUserId, threadId]);
 
@@ -197,7 +253,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
       return;
     }
 
-    setIsLoading(true);
+    dispatch({ type: "set_loading", payload: true });
     try {
       const now = new Date().toISOString();
       const userMessageId =
@@ -219,24 +275,26 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
         lastMessageText: text,
       });
 
-      setMessages((current) =>
-        mergeMessages(current, [
+      dispatch({
+        type: "merge_messages",
+        payload: [
           {
             id: userMessageId,
             role: "user",
             text,
             createdAt: now,
           },
-        ]),
-      );
-      setThreads((current) =>
-        upsertThread(current, {
+        ],
+      });
+      dispatch({
+        type: "upsert_thread",
+        payload: {
           threadId,
           lastMessageAt: now,
           lastMessageText: text,
-        }),
-      );
-      setDraft("");
+        },
+      });
+      dispatch({ type: "set_draft", payload: "" });
 
       const bearerToken = accessToken ?? (await getAccessToken());
       if (!bearerToken) {
@@ -252,48 +310,51 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
 
       const assistantAnswer = data.answer;
       if (assistantAnswer) {
-        setMessages((current) =>
-          mergeMessages(current, [
+        dispatch({
+          type: "merge_messages",
+          payload: [
             {
               id: data.messageId ?? `${threadId}-a-${Date.now()}`,
               role: "assistant",
               text: assistantAnswer,
               createdAt: new Date().toISOString(),
             },
-          ]),
-        );
+          ],
+        });
       }
 
       const nextThread = data.thread;
       if (nextThread) {
-        setThreads((current) =>
-          upsertThread(current, {
+        dispatch({
+          type: "upsert_thread",
+          payload: {
             threadId: nextThread.threadId,
             lastMessageAt: nextThread.lastMessageAt,
             lastMessageText: nextThread.lastMessageText,
-          }),
-        );
+          },
+        });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Chat request failed.";
-      setMessages((current) => [
-        ...current,
-        {
-          id: `${threadId}-e-${Date.now()}`,
-          role: "assistant",
-          text: message,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      dispatch({
+        type: "merge_messages",
+        payload: [
+          {
+            id: `${threadId}-e-${Date.now()}`,
+            role: "assistant",
+            text: message,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      });
     } finally {
-      setIsLoading(false);
+      dispatch({ type: "set_loading", payload: false });
     }
   }
 
   function handleNewThread() {
     const nextThreadId = typeof crypto !== "undefined" ? crypto.randomUUID() : `thread-${Date.now()}`;
-    setThreadId(nextThreadId);
-    setMessages([]);
+    dispatch({ type: "start_new_thread", payload: nextThreadId });
   }
 
   return (
@@ -335,7 +396,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
             <button
               className={styles.threadButton}
               key={thread.threadId}
-              onClick={() => setThreadId(thread.threadId)}
+              onClick={() => dispatch({ type: "set_thread_id", payload: thread.threadId })}
               type="button"
             >
               {thread.lastMessageText
@@ -361,7 +422,7 @@ export function ChatPanel({ onClose, mobile = false, userId }: ChatPanelProps) {
         <div className={styles.composeRow}>
           <textarea
             className={styles.input}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => dispatch({ type: "set_draft", payload: event.target.value })}
             placeholder="Message"
             rows={3}
             value={draft}

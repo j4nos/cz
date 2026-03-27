@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useReducer, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { PlainCta } from "@/components/sections/PlainCta";
@@ -37,6 +37,112 @@ type Props = {
   redirectAfterDelete?: string;
 };
 
+type PricingEditorLocalState = {
+  pricingState: ProductPricingState | null;
+  minQuantity: string;
+  discountPercent: string;
+  couponCode: string;
+  couponPrice: string;
+  error: string;
+};
+
+type PricingEditorAction =
+  | { type: "load_success"; payload: ProductPricingState }
+  | { type: "update_field"; key: keyof ProductPricingState; value: ProductPricingState[keyof ProductPricingState] }
+  | { type: "set_error"; payload: string }
+  | { type: "clear_error" }
+  | { type: "add_tier"; payload: PricingTier }
+  | { type: "remove_tier"; payload: string }
+  | { type: "set_min_quantity"; payload: string }
+  | { type: "set_discount_percent"; payload: string }
+  | { type: "set_coupon_code"; payload: string }
+  | { type: "set_coupon_price"; payload: string }
+  | { type: "replace_pricing_state"; payload: ProductPricingState }
+  | { type: "add_coupon"; payload: { code: string; discountedUnitPrice: number } }
+  | { type: "remove_coupon"; payload: string }
+  | { type: "reset_tier_inputs" }
+  | { type: "reset_coupon_inputs" };
+
+const initialPricingEditorState: PricingEditorLocalState = {
+  pricingState: null,
+  minQuantity: "1",
+  discountPercent: "0",
+  couponCode: "",
+  couponPrice: "",
+  error: "",
+};
+
+function pricingEditorReducer(
+  state: PricingEditorLocalState,
+  action: PricingEditorAction,
+): PricingEditorLocalState {
+  switch (action.type) {
+    case "load_success":
+      return { ...state, pricingState: action.payload };
+    case "update_field":
+      return state.pricingState
+        ? {
+            ...state,
+            pricingState: { ...state.pricingState, [action.key]: action.value },
+          }
+        : state;
+    case "set_error":
+      return { ...state, error: action.payload };
+    case "clear_error":
+      return { ...state, error: "" };
+    case "add_tier":
+      return state.pricingState
+        ? {
+            ...state,
+            pricingState: addPricingTierToState(state.pricingState, action.payload),
+          }
+        : state;
+    case "remove_tier":
+      return state.pricingState
+        ? {
+            ...state,
+            pricingState: removePricingTierFromState(state.pricingState, action.payload),
+          }
+        : state;
+    case "set_min_quantity":
+      return { ...state, minQuantity: action.payload };
+    case "set_discount_percent":
+      return { ...state, discountPercent: action.payload };
+    case "set_coupon_code":
+      return { ...state, couponCode: action.payload };
+    case "set_coupon_price":
+      return { ...state, couponPrice: action.payload };
+    case "replace_pricing_state":
+      return { ...state, pricingState: action.payload };
+    case "add_coupon":
+      return state.pricingState
+        ? {
+            ...state,
+            pricingState: {
+              ...state.pricingState,
+              coupons: [...state.pricingState.coupons, action.payload],
+            },
+          }
+        : state;
+    case "remove_coupon":
+      return state.pricingState
+        ? {
+            ...state,
+            pricingState: {
+              ...state.pricingState,
+              coupons: state.pricingState.coupons.filter((coupon) => coupon.code !== action.payload),
+            },
+          }
+        : state;
+    case "reset_tier_inputs":
+      return { ...state, minQuantity: "1", discountPercent: "0" };
+    case "reset_coupon_inputs":
+      return { ...state, couponCode: "", couponPrice: "" };
+    default:
+      return state;
+  }
+}
+
 export function PricingEditor({
   assetId,
   listingId,
@@ -51,12 +157,9 @@ export function PricingEditor({
     : "";
   const { setToast } = useToast();
   const productPricingService = useMemo(() => createProductPricingFacade(), []);
-  const [state, setState] = useState<ProductPricingState | null>(null);
-  const [minQuantity, setMinQuantity] = useState("1");
-  const [discountPercent, setDiscountPercent] = useState("0");
-  const [couponCode, setCouponCode] = useState("");
-  const [couponPrice, setCouponPrice] = useState("");
-  const [error, setError] = useState("");
+  const [editorState, dispatch] = useReducer(pricingEditorReducer, initialPricingEditorState);
+  const { pricingState: state, minQuantity, discountPercent, couponCode, couponPrice, error } =
+    editorState;
 
   useEffect(() => {
     async function load() {
@@ -64,7 +167,10 @@ export function PricingEditor({
         listingId,
         preselectedProductId
       );
-      setState(mode === "create" ? { ...nextState, productId: "" } : nextState);
+      dispatch({
+        type: "load_success",
+        payload: mode === "create" ? { ...nextState, productId: "" } : nextState,
+      });
     }
 
     void load();
@@ -74,7 +180,7 @@ export function PricingEditor({
     key: Key,
     value: ProductPricingState[Key]
   ) {
-    setState((current) => (current ? { ...current, [key]: value } : current));
+    dispatch({ type: "update_field", key, value });
   }
 
   async function persistState(nextState: ProductPricingState) {
@@ -83,7 +189,7 @@ export function PricingEditor({
       listingId,
       accessToken,
     });
-    setState(saved);
+    dispatch({ type: "replace_pricing_state", payload: saved });
     if (saved.productId) {
       const nextProductPath = `/asset-provider/assets/${assetId}/listings/${listingId}/pricing/product/${saved.productId}`;
       if (nextProductPath !== currentProductPath) {
@@ -101,16 +207,16 @@ export function PricingEditor({
 
     const pricingError = getPricingStateError(state);
     if (pricingError) {
-      setError(pricingError);
+      dispatch({ type: "set_error", payload: pricingError });
       return;
     }
 
     try {
-      setError("");
+      dispatch({ type: "clear_error" });
       const saved = await persistState(state);
       setToast(saved.productId ? "Product saved." : "Product created.", "success", 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cannot save product.");
+      dispatch({ type: "set_error", payload: err instanceof Error ? err.message : "Cannot save product." });
     }
   }
 
@@ -128,7 +234,7 @@ export function PricingEditor({
       discountPercent: nextDiscountPercent,
     });
     if (tierError) {
-      setError(tierError);
+      dispatch({ type: "set_error", payload: tierError });
       return;
     }
 
@@ -138,14 +244,13 @@ export function PricingEditor({
       discountPercent: nextDiscountPercent,
     });
 
-    setState((current) => (current ? addPricingTierToState(current, tier) : current));
-    setMinQuantity("1");
-    setDiscountPercent("0");
+    dispatch({ type: "add_tier", payload: tier });
+    dispatch({ type: "reset_tier_inputs" });
     setToast("Pricing tier added.", "success", 2000);
   }
 
   function handleRemoveTier(tierId: string) {
-    setState((current) => (current ? removePricingTierFromState(current, tierId) : current));
+    dispatch({ type: "remove_tier", payload: tierId });
     setToast("Pricing tier removed.", "success", 2000);
   }
 
@@ -160,48 +265,47 @@ export function PricingEditor({
 
     if (!nextCode) {
       const message = "Coupon code is required.";
-      setError(message);
+      dispatch({ type: "set_error", payload: message });
       setToast(message, "danger", 2200);
       return;
     }
     if (!Number.isFinite(nextPrice) || nextPrice < 0) {
       const message = "Coupon price must be a valid non-negative number.";
-      setError(message);
+      dispatch({ type: "set_error", payload: message });
       setToast(message, "danger", 2200);
       return;
     }
     if (nextPrice >= state.unitPrice) {
       const message = "Coupon price must be lower than the base unit price.";
-      setError(message);
+      dispatch({ type: "set_error", payload: message });
       setToast(message, "danger", 2200);
       return;
     }
     if (state.coupons.some((coupon) => coupon.code === nextCode)) {
       const message = "Coupon code already exists for this product.";
-      setError(message);
+      dispatch({ type: "set_error", payload: message });
       setToast(message, "danger", 2200);
       return;
     }
 
-    setError("");
+    dispatch({ type: "clear_error" });
     const nextState = {
       ...state,
       coupons: [...state.coupons, { code: nextCode, discountedUnitPrice: nextPrice }],
     };
-    setState(nextState);
+    dispatch({ type: "add_coupon", payload: { code: nextCode, discountedUnitPrice: nextPrice } });
     if (nextState.productId) {
       try {
         await persistState(nextState);
       } catch (err) {
-        setState(state);
+        dispatch({ type: "replace_pricing_state", payload: state });
         const message = err instanceof Error ? err.message : "Cannot save coupon.";
-        setError(message);
+        dispatch({ type: "set_error", payload: message });
         setToast(message, "danger", 2600);
         return;
       }
     }
-    setCouponCode("");
-    setCouponPrice("");
+    dispatch({ type: "reset_coupon_inputs" });
     setToast("Coupon added.", "success", 2000);
   }
 
@@ -214,14 +318,14 @@ export function PricingEditor({
       ...state,
       coupons: state.coupons.filter((coupon) => coupon.code !== code),
     };
-    setState(nextState);
+    dispatch({ type: "remove_coupon", payload: code });
     if (nextState.productId) {
       try {
         await persistState(nextState);
       } catch (err) {
-        setState(state);
+        dispatch({ type: "replace_pricing_state", payload: state });
         const message = err instanceof Error ? err.message : "Cannot remove coupon.";
-        setError(message);
+        dispatch({ type: "set_error", payload: message });
         setToast(message, "danger", 2600);
         return;
       }
@@ -245,14 +349,14 @@ export function PricingEditor({
     }
 
     try {
-      setError("");
+      dispatch({ type: "clear_error" });
       await productPricingService.deleteProduct(state.productId);
       router.push(
         redirectAfterDelete ??
           `/asset-provider/assets/${assetId}/listings/${listingId}/edit`
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cannot delete product.");
+      dispatch({ type: "set_error", payload: err instanceof Error ? err.message : "Cannot delete product." });
     }
   }
 
@@ -367,7 +471,7 @@ export function PricingEditor({
               type="number"
               min="1"
               value={minQuantity}
-              onChange={(event) => setMinQuantity(event.target.value)}
+              onChange={(event) => dispatch({ type: "set_min_quantity", payload: event.target.value })}
             />
           </FormField>
           <FormField
@@ -379,7 +483,7 @@ export function PricingEditor({
               type="number"
               min="0"
               value={discountPercent}
-              onChange={(event) => setDiscountPercent(event.target.value)}
+              onChange={(event) => dispatch({ type: "set_discount_percent", payload: event.target.value })}
             />
           </FormField>
           <Button type="submit">Add tier</Button>
@@ -392,7 +496,7 @@ export function PricingEditor({
             <FormInput
               id="product-coupon-code"
               value={couponCode}
-              onChange={(event) => setCouponCode(event.target.value)}
+              onChange={(event) => dispatch({ type: "set_coupon_code", payload: event.target.value })}
               placeholder="SPRING24"
             />
           </FormField>
@@ -402,7 +506,7 @@ export function PricingEditor({
               type="number"
               min="0"
               value={couponPrice}
-              onChange={(event) => setCouponPrice(event.target.value)}
+              onChange={(event) => dispatch({ type: "set_coupon_price", payload: event.target.value })}
               placeholder="850"
             />
           </FormField>

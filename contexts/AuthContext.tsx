@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer } from "react";
 
 import type { AuthUser } from "@/src/application/interfaces/authClient";
 import type { UserProfile } from "@/src/domain/entities";
@@ -47,20 +47,80 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+type AuthState = {
+  user: AuthUser | null;
+  profile: UserProfile | null;
+  accessToken: string | null;
+  isAdmin: boolean;
+  loading: boolean;
+  error: string | null;
+};
+
+type AuthAction =
+  | { type: "start_loading" }
+  | { type: "finish_loading" }
+  | { type: "clear_error" }
+  | { type: "set_error"; payload: string }
+  | {
+      type: "set_session";
+      payload: {
+        user: AuthUser | null;
+        profile: UserProfile | null;
+        accessToken: string | null;
+        isAdmin: boolean;
+      };
+    }
+  | { type: "clear_session" };
+
+const initialAuthState: AuthState = {
+  user: null,
+  profile: null,
+  accessToken: null,
+  isAdmin: false,
+  loading: true,
+  error: null,
+};
+
+function authReducer(state: AuthState, action: AuthAction): AuthState {
+  switch (action.type) {
+    case "start_loading":
+      return { ...state, loading: true };
+    case "finish_loading":
+      return { ...state, loading: false };
+    case "clear_error":
+      return { ...state, error: null };
+    case "set_error":
+      return { ...state, error: action.payload };
+    case "set_session":
+      return {
+        ...state,
+        user: action.payload.user,
+        profile: action.payload.profile,
+        accessToken: action.payload.accessToken,
+        isAdmin: action.payload.isAdmin,
+      };
+    case "clear_session":
+      return {
+        ...state,
+        user: null,
+        profile: null,
+        accessToken: null,
+        isAdmin: false,
+      };
+    default:
+      return state;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const authClient = useMemo(() => createAuthClient(), []);
   const checkIsAdminUseCase = useMemo(() => new CheckIsAdminUserUseCase(authClient), [authClient]);
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(authReducer, initialAuthState);
+  const { user, profile, accessToken, isAdmin, loading, error } = state;
 
   const isGuest = profile?.role === "GUEST";
 
   async function refreshSessionState(nextUser: AuthUser | null) {
-    setUser(nextUser);
     let nextProfile = nextUser ? await authClient.getUserProfile(nextUser.uid) : null;
     if (nextUser && !nextProfile && nextUser.email) {
       await authClient.upsertUserProfile({
@@ -73,9 +133,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       nextProfile = await authClient.getUserProfile(nextUser.uid);
     }
-    setProfile(nextProfile);
-    setAccessToken(await authClient.getAccessToken());
-    setIsAdmin(nextUser && nextProfile?.role !== "GUEST" ? await checkIsAdminUseCase.execute() : false);
+    dispatch({
+      type: "set_session",
+      payload: {
+        user: nextUser,
+        profile: nextProfile,
+        accessToken: await authClient.getAccessToken(),
+        isAdmin: Boolean(
+          nextUser && nextProfile?.role !== "GUEST"
+            ? await checkIsAdminUseCase.execute()
+            : false,
+        ),
+      },
+    });
   }
 
   useEffect(() => {
@@ -87,17 +157,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        setLoading(true);
+        dispatch({ type: "start_loading" });
         try {
           await refreshSessionState(nextUser);
         } catch (nextError) {
-          setUser(null);
-          setProfile(null);
-          setAccessToken(null);
-          setError(nextError instanceof Error ? nextError.message : "Failed to initialize auth.");
+          dispatch({ type: "clear_session" });
+          dispatch({
+            type: "set_error",
+            payload: nextError instanceof Error ? nextError.message : "Failed to initialize auth.",
+          });
         } finally {
           if (active) {
-            setLoading(false);
+            dispatch({ type: "finish_loading" });
           }
         }
       })();
@@ -123,26 +194,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       error,
       signInWithGoogle: async () => {
-        setError(null);
+        dispatch({ type: "clear_error" });
         await authClient.signInWithGoogle();
       },
       login: async (email, password) => {
-        setError(null);
-        setLoading(true);
+        dispatch({ type: "clear_error" });
+        dispatch({ type: "start_loading" });
         try {
           const nextUser = await authClient.signInWithEmailAndPassword(email, password);
           await refreshSessionState(nextUser);
           return await authClient.getUserProfile(nextUser.uid);
         } catch (nextError) {
-          setError(nextError instanceof Error ? nextError.message : "Login failed.");
+          dispatch({
+            type: "set_error",
+            payload: nextError instanceof Error ? nextError.message : "Login failed.",
+          });
           throw nextError;
         } finally {
-          setLoading(false);
+          dispatch({ type: "finish_loading" });
         }
       },
       register: async ({ email, password, role, country }) => {
-        setError(null);
-        setLoading(true);
+        dispatch({ type: "clear_error" });
+        dispatch({ type: "start_loading" });
 
         try {
           const result = await authClient.createUserWithEmailAndPassword(email, password);
@@ -162,15 +236,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           return { needsConfirmation: result.needsConfirmation, profile: null };
         } catch (nextError) {
-          setError(nextError instanceof Error ? nextError.message : "Registration failed.");
+          dispatch({
+            type: "set_error",
+            payload: nextError instanceof Error ? nextError.message : "Registration failed.",
+          });
           throw nextError;
         } finally {
-          setLoading(false);
+          dispatch({ type: "finish_loading" });
         }
       },
       confirmRegistration: async ({ email, password, code, role, country }) => {
-        setError(null);
-        setLoading(true);
+        dispatch({ type: "clear_error" });
+        dispatch({ type: "start_loading" });
         try {
           await authClient.confirmUserSignUp(email, code);
           const nextUser = await authClient.signInWithEmailAndPassword(email, password);
@@ -185,50 +262,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await refreshSessionState(nextUser);
           return await authClient.getUserProfile(nextUser.uid);
         } catch (nextError) {
-          setError(nextError instanceof Error ? nextError.message : "Confirmation failed.");
+          dispatch({
+            type: "set_error",
+            payload: nextError instanceof Error ? nextError.message : "Confirmation failed.",
+          });
           throw nextError;
         } finally {
-          setLoading(false);
+          dispatch({ type: "finish_loading" });
         }
       },
       resendConfirmationCode: async (email) => {
-        setError(null);
+        dispatch({ type: "clear_error" });
         try {
           await authClient.resendConfirmationCode(email);
         } catch (nextError) {
-          setError(nextError instanceof Error ? nextError.message : "Could not resend confirmation code.");
+          dispatch({
+            type: "set_error",
+            payload: nextError instanceof Error ? nextError.message : "Could not resend confirmation code.",
+          });
           throw nextError;
         }
       },
       requestPasswordReset: async (email) => {
-        setError(null);
+        dispatch({ type: "clear_error" });
         try {
           await authClient.requestPasswordReset(email);
         } catch (nextError) {
-          setError(nextError instanceof Error ? nextError.message : "Reset request failed.");
+          dispatch({
+            type: "set_error",
+            payload: nextError instanceof Error ? nextError.message : "Reset request failed.",
+          });
           throw nextError;
         }
       },
       confirmPasswordReset: async (email, code, newPassword) => {
-        setError(null);
+        dispatch({ type: "clear_error" });
         try {
           await authClient.confirmPasswordReset(email, code, newPassword);
         } catch (nextError) {
-          setError(nextError instanceof Error ? nextError.message : "Reset failed.");
+          dispatch({
+            type: "set_error",
+            payload: nextError instanceof Error ? nextError.message : "Reset failed.",
+          });
           throw nextError;
         }
       },
       logout: async () => {
-        setError(null);
-        setLoading(true);
+        dispatch({ type: "clear_error" });
+        dispatch({ type: "start_loading" });
         try {
           await authClient.signOut();
-          setUser(null);
-          setProfile(null);
-          setAccessToken(null);
-          setIsAdmin(false);
+          dispatch({ type: "clear_session" });
         } finally {
-          setLoading(false);
+          dispatch({ type: "finish_loading" });
         }
       },
       refreshProfile: async () => {
